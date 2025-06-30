@@ -14,3 +14,23 @@ train/val/test splits. By default data are cached under `~/.cache/otxlearner/ihd
 `load_twins()` expects a `twins.npz` archive with arrays `x`, `t`, `y0`, and
 `y1`. It returns deterministic train/val/test splits and caches the dataset under
 `~/.cache/otxlearner/twins`.
+
+## Quick start
+
+Install the required packages and run a short training session on IHDP. The
+dataset is downloaded automatically on first use.
+
+```bash
+python -m pip install torch geomloss  # plus other deps in requirements.txt
+python -m pip install -r requirements.txt
+
+# train for a few epochs and log metrics under `runs/ihdp`
+python src/train.py --epochs 5 --log-dir runs/ihdp
+
+# evaluate a saved checkpoint (if you saved `model.pt` during training)
+python src/evaluate.py model.pt --data-root ~/.cache/otxlearner/ihdp \
+    --csv results.csv --plot results.png
+```
+
+The [training_curves.ipynb](notebooks/training_curves.ipynb) notebook shows how
+to visualise the TensorBoard logs produced during training.
