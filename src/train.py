@@ -12,6 +12,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
+import numpy.typing as npt
 
 from .data import IHDPDataset, IHDPSplit, load_ihdp
 from .models import MLPEncoder, Sinkhorn
@@ -47,7 +48,7 @@ class TorchIHDP:
     test: TorchSplit
 
 
-def _to_tensor(x: torch.Tensor | np.ndarray) -> torch.Tensor:
+def _to_tensor(x: torch.Tensor | npt.NDArray[np.floating]) -> torch.Tensor:
     return torch.as_tensor(x, dtype=torch.float32)
 
 
