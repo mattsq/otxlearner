@@ -16,6 +16,7 @@ import numpy.typing as npt
 
 from .data import IHDPDataset, IHDPSplit, load_ihdp
 from .models import MLPEncoder, Sinkhorn
+from .utils import estimate_propensity_splits
 
 
 @dataclass
@@ -27,6 +28,7 @@ class TorchSplit(torch.utils.data.Dataset[tuple[torch.Tensor, ...]]):
     yf: torch.Tensor
     mu0: torch.Tensor
     mu1: torch.Tensor
+    e_hat: torch.Tensor
 
     def __len__(self) -> int:  # pragma: no cover - trivial
         return self.x.shape[0]
@@ -38,6 +40,7 @@ class TorchSplit(torch.utils.data.Dataset[tuple[torch.Tensor, ...]]):
             self.yf[idx],
             self.mu0[idx],
             self.mu1[idx],
+            self.e_hat[idx],
         )
 
 
@@ -52,19 +55,35 @@ def _to_tensor(x: torch.Tensor | npt.NDArray[np.float64]) -> torch.Tensor:
     return torch.as_tensor(x, dtype=torch.float32)
 
 
-def torchify(ds: IHDPDataset) -> TorchIHDP:
+def torchify(
+    ds: IHDPDataset,
+    propensities: (
+        tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]
+        | None
+    ) = None,
+) -> TorchIHDP:
     """Convert numpy IHDP dataset to PyTorch tensors."""
 
-    def convert(split: IHDPSplit) -> TorchSplit:
+    def convert(split: IHDPSplit, p: npt.NDArray[np.float64]) -> TorchSplit:
         return TorchSplit(
             _to_tensor(split.x),
             _to_tensor(split.t),
             _to_tensor(split.yf),
             _to_tensor(split.mu0),
             _to_tensor(split.mu1),
+            _to_tensor(p),
         )
 
-    return TorchIHDP(convert(ds.train), convert(ds.val), convert(ds.test))
+    if propensities is None:
+        zero_train = np.full(ds.train.t.shape[0], 0.5, dtype=np.float64)
+        zero_val = np.full(ds.val.t.shape[0], 0.5, dtype=np.float64)
+        zero_test = np.full(ds.test.t.shape[0], 0.5, dtype=np.float64)
+        propensities = (zero_train, zero_val, zero_test)
+
+    train_split = convert(ds.train, propensities[0])
+    val_split = convert(ds.val, propensities[1])
+    test_split = convert(ds.test, propensities[2])
+    return TorchIHDP(train_split, val_split, test_split)
 
 
 def cosine_warmup_lambda(
@@ -87,6 +106,45 @@ def cosine_warmup_lambda(
     return schedule
 
 
+def _validate(
+    model: MLPEncoder,
+    loader: DataLoader[tuple[torch.Tensor, ...]],
+    sinkhorn: Sinkhorn,
+    device: torch.device,
+) -> tuple[float, float, float]:
+    model.eval()
+    val_tau_err = 0.0
+    val_bal = 0.0
+    tau_preds: list[torch.Tensor] = []
+    tau_targets: list[torch.Tensor] = []
+    with torch.no_grad():
+        for x, t, _yf, mu0, mu1, _e_hat in loader:
+            x, t, mu0, mu1 = (
+                x.to(device),
+                t.to(device),
+                mu0.to(device),
+                mu1.to(device),
+            )
+            tau_true = mu1 - mu0
+            feats = model.net(x)
+            tau = model.tau_head(feats).squeeze(-1)
+            val_tau_err += nn.functional.mse_loss(tau, tau_true, reduction="sum").item()
+            feats_t = feats[t.bool()]
+            feats_c = feats[~t.bool()]
+            if len(feats_t) > 0 and len(feats_c) > 0:
+                val_bal += sinkhorn(feats_t, feats_c).item() * x.size(0)
+            tau_preds.append(tau)
+            tau_targets.append(tau_true)
+
+    from typing import Sized, cast
+
+    n = int(len(cast(Sized, loader.dataset)))
+    val_mse = val_tau_err / n
+    val_bal /= n
+    val_metric = val_mse + 0.1 * val_bal
+    return val_metric, val_mse, val_bal
+
+
 def train(
     root: str | Path,
     *,
@@ -98,12 +156,13 @@ def train(
     patience: int = 5,
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
-) -> None:
+) -> list[float]:
     """Train the baseline model on IHDP."""
 
     device = torch.device(device)
     ds_np = load_ihdp(root)
-    ds = torchify(ds_np)
+    props = estimate_propensity_splits(ds_np)
+    ds = torchify(ds_np, props)
 
     train_loader = DataLoader(ds.train, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(ds.val, batch_size=batch_size)
@@ -119,6 +178,11 @@ def train(
 
     best_metric = float("inf")
     epochs_without_improve = 0
+    history: list[float] = []
+
+    init_metric, _init_mse, _init_bal = _validate(model, val_loader, sinkhorn, device)
+    writer.add_scalar("val_PEHE_proxy", init_metric, 0)  # type: ignore[no-untyped-call]
+    history.append(init_metric)
 
     for epoch in range(epochs):
         lam = schedule(epoch)
@@ -126,23 +190,27 @@ def train(
         writer.add_scalar("epsilon", epsilon, epoch)  # type: ignore[no-untyped-call]
         model.train()
         running_loss = 0.0
-        for x, t, yf, mu0, mu1 in train_loader:
-            x, t, yf, mu0, mu1 = (
+        for x, t, yf, mu0, mu1, e_hat in train_loader:
+            x, t, yf, mu0, mu1, e_hat = (
                 x.to(device),
                 t.to(device),
                 yf.to(device),
                 mu0.to(device),
                 mu1.to(device),
+                e_hat.to(device),
             )
-            tau_true = mu1 - mu0
             optim.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast():
                 feats = model.net(x)
                 outcome = model.outcome_head(feats).squeeze(-1)
                 tau = model.tau_head(feats).squeeze(-1)
+                mu1_pred = outcome + tau
                 y_pred = outcome + t * tau
                 factual_loss = nn.functional.mse_loss(y_pred, yf)
-                tau_loss = nn.functional.mse_loss(tau, tau_true)
+                D_hat = t * (yf - outcome) / e_hat + (1 - t) * (mu1_pred - yf) / (
+                    1 - e_hat
+                )
+                tau_loss = nn.functional.mse_loss(tau, D_hat)
                 feats_t = feats[t.bool()]
                 feats_c = feats[~t.bool()]
                 if len(feats_t) > 0 and len(feats_c) > 0:
@@ -162,45 +230,11 @@ def train(
         writer.add_scalar("train_loss", avg_loss, epoch)  # type: ignore[no-untyped-call]
 
         # validation
-        model.eval()
-        val_tau_err = 0.0
-        val_bal = 0.0
-        tau_preds: list[torch.Tensor] = []
-        tau_targets: list[torch.Tensor] = []
-        with torch.no_grad():
-            for x, t, yf, mu0, mu1 in val_loader:
-                x, t, mu0, mu1 = (
-                    x.to(device),
-                    t.to(device),
-                    mu0.to(device),
-                    mu1.to(device),
-                )
-                tau_true = mu1 - mu0
-                feats = model.net(x)
-                tau = model.tau_head(feats).squeeze(-1)
-                val_tau_err += nn.functional.mse_loss(
-                    tau, tau_true, reduction="sum"
-                ).item()
-                feats_t = feats[t.bool()]
-                feats_c = feats[~t.bool()]
-                if len(feats_t) > 0 and len(feats_c) > 0:
-                    val_bal += sinkhorn(feats_t, feats_c).item() * x.size(0)
-                tau_preds.append(tau)
-                tau_targets.append(tau_true)
-
-        val_mse = val_tau_err / len(ds.val)
-        val_bal /= len(ds.val)
-        val_metric = val_mse + 0.1 * val_bal
-        writer.add_scalar("val_PEHE_proxy", val_metric, epoch)  # type: ignore[no-untyped-call]
-        writer.add_scalar("val_mse", val_mse, epoch)  # type: ignore[no-untyped-call]
-        writer.add_scalar("val_bal", val_bal, epoch)  # type: ignore[no-untyped-call]
-
-        pehe = torch.sqrt(torch.tensor(val_mse)).item()
-        ate_pred = torch.cat(tau_preds).mean().item()
-        ate_true = torch.cat(tau_targets).mean().item()
-        ate_err = ate_pred - ate_true
-        writer.add_scalar("val_PEHE", pehe, epoch)  # type: ignore[no-untyped-call]
-        writer.add_scalar("val_ATE_error", ate_err, epoch)  # type: ignore[no-untyped-call]
+        val_metric, val_mse, val_bal = _validate(model, val_loader, sinkhorn, device)
+        writer.add_scalar("val_PEHE_proxy", val_metric, epoch + 1)  # type: ignore[no-untyped-call]
+        writer.add_scalar("val_mse", val_mse, epoch + 1)  # type: ignore[no-untyped-call]
+        writer.add_scalar("val_bal", val_bal, epoch + 1)  # type: ignore[no-untyped-call]
+        history.append(val_metric)
 
         if val_metric < best_metric:
             best_metric = val_metric
@@ -211,6 +245,7 @@ def train(
                 break
 
     writer.close()  # type: ignore[no-untyped-call]
+    return history
 
 
 def main() -> None:  # pragma: no cover - CLI wrapper

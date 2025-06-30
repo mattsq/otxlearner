@@ -9,7 +9,7 @@ from src.train import train
 
 
 def test_train_smoke(ihdp_root: Path) -> None:
-    train(
+    history = train(
         root=ihdp_root,
         epochs=1,
         batch_size=32,
@@ -19,3 +19,5 @@ def test_train_smoke(ihdp_root: Path) -> None:
         patience=1,
         log_dir=ihdp_root / "logs",
     )
+    assert len(history) == 2
+    assert history[-1] < history[0]

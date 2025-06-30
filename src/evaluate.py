@@ -32,7 +32,7 @@ def evaluate(
 
     device = torch.device(device)
     ds_np = load_ihdp(data_root)
-    ds = torchify(ds_np)
+    ds = torchify(ds_np, None)
     loader = DataLoader(ds.test, batch_size=batch_size)
 
     model = MLPEncoder(ds.test.x.shape[1]).to(device)
@@ -47,7 +47,7 @@ def evaluate(
     tau_preds: list[torch.Tensor] = []
     tau_targets: list[torch.Tensor] = []
     with torch.no_grad():
-        for x, t, _yf, mu0, mu1 in loader:
+        for x, t, _yf, mu0, mu1, _e_hat in loader:
             x, t, mu0, mu1 = (
                 x.to(device),
                 t.to(device),
