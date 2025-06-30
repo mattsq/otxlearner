@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 
 __all__ = ["IHDPSplit", "IHDPDataset", "load_ihdp"]
 
@@ -14,12 +15,12 @@ URL_TEST = "https://www.fredjo.com/files/ihdp_npci_1-100.test.npz"
 
 @dataclass
 class IHDPSplit:
-    x: np.ndarray
-    t: np.ndarray
-    yf: np.ndarray
-    ycf: np.ndarray
-    mu0: np.ndarray
-    mu1: np.ndarray
+    x: npt.NDArray[np.float64]
+    t: npt.NDArray[np.float64]
+    yf: npt.NDArray[np.float64]
+    ycf: npt.NDArray[np.float64]
+    mu0: npt.NDArray[np.float64]
+    mu1: npt.NDArray[np.float64]
 
 
 @dataclass
@@ -37,12 +38,12 @@ def _download(url: str, dest: Path) -> None:
         dest.write_bytes(resp.read())
 
 
-def _load_npz(path: Path) -> dict[str, np.ndarray]:
+def _load_npz(path: Path) -> dict[str, npt.NDArray[np.float64]]:
     data = np.load(path, allow_pickle=False)
     return {k: data[k] for k in data.files}
 
 
-def _flatten(features: np.ndarray) -> np.ndarray:
+def _flatten(features: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     if features.ndim == 3:  # (n, d, r)
         n, d, r = features.shape
         return np.asarray(features.transpose(2, 0, 1).reshape(n * r, d))
@@ -89,7 +90,7 @@ def load_ihdp(
     val_idx = idx[:val_size]
     train_idx = idx[val_size:]
 
-    def split(idx: np.ndarray) -> IHDPSplit:
+    def split(idx: npt.NDArray[np.int_]) -> IHDPSplit:
         return IHDPSplit(
             x=x_train[idx],
             t=t_train[idx],
