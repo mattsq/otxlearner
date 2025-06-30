@@ -61,9 +61,15 @@ jobs:
       IHDP_DATA: /github/home/.cache/otxlearner/ihdp
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+      - name: Install Python
+        run: |
+          apt-get update
+          apt-get install -y software-properties-common
+          add-apt-repository ppa:deadsnakes/ppa -y
+          apt-get update
+          apt-get install -y python${{ matrix.python-version }} python${{ matrix.python-version }}-distutils python${{ matrix.python-version }}-venv python3-pip
+          ln -sf /usr/bin/python${{ matrix.python-version }} /usr/local/bin/python
+          python -m pip install --upgrade pip
       - uses: actions/cache@v3
         with:
           path: ~/.cache/pip
