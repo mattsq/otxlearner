@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 
 __all__ = ["TwinsSplit", "TwinsDataset", "load_twins"]
 
@@ -13,12 +14,12 @@ URL = "https://example.com/twins.npz"
 
 @dataclass
 class TwinsSplit:
-    x: np.ndarray
-    t: np.ndarray
-    yf: np.ndarray
-    ycf: np.ndarray
-    mu0: np.ndarray
-    mu1: np.ndarray
+    x: npt.NDArray[np.float64]
+    t: npt.NDArray[np.float64]
+    yf: npt.NDArray[np.float64]
+    ycf: npt.NDArray[np.float64]
+    mu0: npt.NDArray[np.float64]
+    mu1: npt.NDArray[np.float64]
 
 
 @dataclass
@@ -36,7 +37,7 @@ def _download(url: str, dest: Path) -> None:
         dest.write_bytes(resp.read())
 
 
-def _load_npz(path: Path) -> dict[str, np.ndarray]:
+def _load_npz(path: Path) -> dict[str, npt.NDArray[np.float64]]:
     data = np.load(path, allow_pickle=False)
     return {k: data[k] for k in data.files}
 
@@ -67,7 +68,7 @@ def load_twins(
     val_idx = idx[-val_size * 2 : -val_size]
     test_idx = idx[-val_size:]
 
-    def split(i: np.ndarray) -> TwinsSplit:
+    def split(i: npt.NDArray[np.int_]) -> TwinsSplit:
         return TwinsSplit(
             x=x[i],
             t=t[i],

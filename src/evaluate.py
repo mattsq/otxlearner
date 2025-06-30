@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import csv
 from pathlib import Path
+from types import ModuleType
+from typing import Optional
 
 import torch
 from torch import nn
@@ -83,8 +85,11 @@ def evaluate(
             writer.writerow(metrics)
 
     if plot_file is not None:
+        plt: Optional[ModuleType]
         try:
-            import matplotlib.pyplot as plt  # type: ignore
+            import importlib
+
+            plt = importlib.import_module("matplotlib.pyplot")
         except Exception:
             plt = None
         if plt is not None:
