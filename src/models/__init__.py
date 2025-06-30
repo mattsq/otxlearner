@@ -1,5 +1,6 @@
 from __future__ import annotations
 
 from .sinkhorn import Sinkhorn
+from .mlp import MLPEncoder
 
-__all__ = ["Sinkhorn"]
+__all__ = ["MLPEncoder", "Sinkhorn"]
