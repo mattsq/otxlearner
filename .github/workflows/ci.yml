@@ -56,7 +56,7 @@ jobs:
       image: nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
     strategy:
       matrix:
-        python-version: ['3.10', '3.11']
+        python-version: ['3.10']
     env:
       IHDP_DATA: /github/home/.cache/otxlearner/ihdp
     steps:
