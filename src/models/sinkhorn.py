@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 import torch
-from geomloss import SamplesLoss
+from geomloss import SamplesLoss  # type: ignore[import-untyped]
 
 
 class Sinkhorn(torch.nn.Module):
