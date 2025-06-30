@@ -10,3 +10,7 @@ This repository currently contains a minimal project skeleton. Code lives under
 
 `load_ihdp()` downloads the public IHDP benchmark and returns deterministic
 train/val/test splits. By default data are cached under `~/.cache/otxlearner/ihdp`.
+
+`load_twins()` expects a `twins.npz` archive with arrays `x`, `t`, `y0`, and
+`y1`. It returns deterministic train/val/test splits and caches the dataset under
+`~/.cache/otxlearner/twins`.
