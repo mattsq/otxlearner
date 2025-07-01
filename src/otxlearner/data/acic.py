@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 
+from .utils import download
+
 __all__ = ["ACICSplit", "ACICDataset", "load_acic"]
 
-URL = "https://example.com/acic.npz"
+URL_2016 = "https://example.com/acic_2016.npz"
+URL_2018 = "https://example.com/acic_2018.npz"
+SHA_2016 = "0000000000000000000000000000000000000000000000000000000000000000"
+SHA_2018 = "0000000000000000000000000000000000000000000000000000000000000000"
 
 
 @dataclass
@@ -29,12 +33,8 @@ class ACICDataset:
     test: ACICSplit
 
 
-def _download(url: str, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        return
-    with urllib.request.urlopen(url) as resp:
-        dest.write_bytes(resp.read())
+def _download(url: str, dest: Path, sha: str) -> None:
+    download(url, dest, sha256=sha)
 
 
 def _load_npz(path: Path) -> dict[str, npt.NDArray[np.float64]]:
@@ -45,14 +45,30 @@ def _load_npz(path: Path) -> dict[str, npt.NDArray[np.float64]]:
 def load_acic(
     root: str | Path = Path.home() / ".cache" / "otxlearner" / "acic",
     *,
+    year: int = 2016,
+    validate: bool | None = None,
     val_fraction: float = 0.1,
     test_fraction: float = 0.1,
     seed: int = 42,
 ) -> ACICDataset:
     """Load ACIC with deterministic train/val/test splits."""
     root = Path(root)
-    path = root / "acic.npz"
-    _download(URL, path)
+    if year == 2016:
+        url = URL_2016
+        sha = SHA_2016
+        fname = "acic_2016.npz"
+    else:
+        url = URL_2018
+        sha = SHA_2018
+        fname = "acic_2018.npz"
+    path = root / fname
+    legacy = root / "acic.npz"
+    if legacy.exists() and not path.exists():
+        path = legacy
+    if validate is None:
+        validate = root == Path.home() / ".cache" / "otxlearner" / "acic"
+    if not path.exists() or validate:
+        _download(url, path, sha)
 
     data = _load_npz(path)
     x = np.asarray(data["x"])

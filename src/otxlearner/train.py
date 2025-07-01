@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 from types import ModuleType
 import importlib
 
@@ -19,7 +19,8 @@ from torch.utils.tensorboard import SummaryWriter
 from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
 
-from .data import IHDPDataset, IHDPSplit, load_ihdp
+from .data import load_ihdp, load_acic, load_twins
+from .data.types import DatasetProtocol, SplitProtocol
 from .models import (
     MLPEncoder,
     Sinkhorn,
@@ -75,6 +76,7 @@ class TrainConfig:
     """Configuration for :func:`train`."""
 
     data_root: Path = Path.home() / ".cache/otxlearner/ihdp"
+    data: str = "ihdp"
     epochs: int = 5
     batch_size: int = 512
     lr: float = 1e-3
@@ -101,15 +103,15 @@ def _to_tensor(x: torch.Tensor | npt.NDArray[np.float64]) -> torch.Tensor:
 
 
 def torchify(
-    ds: IHDPDataset,
+    ds: DatasetProtocol,
     propensities: (
         tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]
         | None
     ) = None,
 ) -> TorchIHDP:
-    """Convert numpy IHDP dataset to PyTorch tensors."""
+    """Convert numpy dataset to PyTorch tensors."""
 
-    def convert(split: IHDPSplit, e: npt.NDArray[np.float64]) -> TorchSplit:
+    def convert(split: SplitProtocol, e: npt.NDArray[np.float64]) -> TorchSplit:
         return TorchSplit(
             _to_tensor(split.x),
             _to_tensor(split.t),
@@ -156,6 +158,7 @@ def cosine_warmup_lambda(
 def train(
     root: str | Path,
     *,
+    data: str = "ihdp",
     epochs: int = 5,
     batch_size: int = 512,
     lr: float = 1e-3,
@@ -173,7 +176,7 @@ def train(
     wandb_log: bool = False,
     wandb_project: str = "otxlearner",
 ) -> list[float]:
-    """Train the baseline model on IHDP and return validation metrics.
+    """Train the baseline model and return validation metrics.
 
     When ``dann`` is ``True`` a domain-adversarial loss with a gradient
     reversal layer replaces the Sinkhorn penalty.
@@ -182,7 +185,12 @@ def train(
     device = torch.device(device)
     torch.manual_seed(seed)
     np.random.seed(seed)
-    ds_np = load_ihdp(root)
+    if data == "ihdp":
+        ds_np = cast(DatasetProtocol, load_ihdp(root))
+    elif data == "twins":
+        ds_np = cast(DatasetProtocol, load_twins(root))
+    else:
+        ds_np = cast(DatasetProtocol, load_acic(root))
     x_all = np.concatenate([ds_np.train.x, ds_np.val.x, ds_np.test.x])
     t_all = np.concatenate([ds_np.train.t, ds_np.val.t, ds_np.test.t])
     e_all = cross_fit_propensity(x_all, t_all, n_splits=5, seed=seed)
@@ -399,6 +407,7 @@ def train_from_config(cfg: TrainConfig) -> list[float]:
 
     return train(
         cfg.data_root,
+        data=cfg.data,
         epochs=cfg.epochs,
         batch_size=cfg.batch_size,
         lr=cfg.lr,
@@ -418,11 +427,10 @@ def train_from_config(cfg: TrainConfig) -> list[float]:
 
 
 def main() -> None:  # pragma: no cover - CLI wrapper
-    parser = argparse.ArgumentParser(description="Train baseline on IHDP")
+    parser = argparse.ArgumentParser(description="Train baseline")
     parser.add_argument("--config", type=Path, default=None, help="Hydra config file")
-    parser.add_argument(
-        "--data-root", type=Path, default=Path.home() / ".cache/otxlearner/ihdp"
-    )
+    parser.add_argument("--data", choices=["ihdp", "twins", "acic"], default="ihdp")
+    parser.add_argument("--data-root", type=Path, default=None)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -456,8 +464,12 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             cfg = compose(config_name=config_path.stem, overrides=unknown)
         train_from_config(cfg)  # type: ignore[arg-type]
     else:
+        root = args.data_root
+        if root is None:
+            root = Path.home() / f".cache/otxlearner/{args.data}"
         train(
-            args.data_root,
+            root,
+            data=args.data,
             epochs=args.epochs,
             batch_size=args.batch_size,
             lr=args.lr,

@@ -11,13 +11,12 @@ This repository currently contains a minimal project skeleton. Code lives under
 `load_ihdp()` downloads the public IHDP benchmark and returns deterministic
 train/val/test splits. By default data are cached under `~/.cache/otxlearner/ihdp`.
 
-`load_twins()` expects a `twins.npz` archive with arrays `x`, `t`, `y0`, and
-`y1`. It returns deterministic train/val/test splits and caches the dataset under
+`load_twins()` downloads the Twins benchmark if needed and returns deterministic
+train/val/test splits. By default data are cached under
 `~/.cache/otxlearner/twins`.
 
-`load_acic()` expects an `acic.npz` archive with arrays `x`, `t`, `y0`, and
-`y1`. By default data are cached under `~/.cache/otxlearner/acic` and the
-function returns deterministic train/val/test splits.
+`load_acic()` supports the ACIC 2016 and 2018 benchmarks. The dataset is
+downloaded on first use and cached under `~/.cache/otxlearner/acic`.
 
 ## Quick start
 

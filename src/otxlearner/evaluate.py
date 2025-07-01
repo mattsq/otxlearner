@@ -1,4 +1,4 @@
-"""Evaluate a trained model on IHDP."""
+"""Evaluate a trained model on a dataset."""
 
 from __future__ import annotations
 
@@ -6,14 +6,15 @@ import argparse
 import csv
 from pathlib import Path
 from types import ModuleType
-from typing import Optional
+from typing import Optional, cast
 import importlib
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from .data import load_ihdp
+from .data import load_ihdp, load_twins, load_acic
+from .data.types import DatasetProtocol
 from .models import MLPEncoder, Sinkhorn
 from .train import torchify
 from .utils import ate, pehe
@@ -30,6 +31,7 @@ def evaluate(
     data_root: str | Path,
     model_path: str | Path,
     *,
+    data: str = "ihdp",
     batch_size: int = 512,
     epsilon: float = 0.05,
     device: str | torch.device = "cpu",
@@ -38,12 +40,17 @@ def evaluate(
     wandb_log: bool = False,
     wandb_project: str = "otxlearner",
 ) -> dict[str, float]:
-    """Run evaluation on the IHDP test split."""
+    """Run evaluation on the specified dataset test split."""
 
     device = torch.device(device)
     if wandb_log and wandb is not None:
         wandb.init(project=wandb_project, job_type="evaluation")
-    ds_np = load_ihdp(data_root)
+    if data == "ihdp":
+        ds_np = cast(DatasetProtocol, load_ihdp(data_root))
+    elif data == "twins":
+        ds_np = cast(DatasetProtocol, load_twins(data_root))
+    else:
+        ds_np = cast(DatasetProtocol, load_acic(data_root))
     ds = torchify(ds_np)
     loader = DataLoader(ds.test, batch_size=batch_size)
 
@@ -131,11 +138,10 @@ def evaluate(
 
 
 def main() -> None:  # pragma: no cover - CLI wrapper
-    parser = argparse.ArgumentParser(description="Evaluate IHDP model")
+    parser = argparse.ArgumentParser(description="Evaluate model")
     parser.add_argument("model", type=Path, help="Path to .pt checkpoint")
-    parser.add_argument(
-        "--data-root", type=Path, default=Path.home() / ".cache/otxlearner/ihdp"
-    )
+    parser.add_argument("--data", choices=["ihdp", "twins", "acic"], default="ihdp")
+    parser.add_argument("--data-root", type=Path, default=None)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--epsilon", type=float, default=0.05)
     parser.add_argument("--csv", type=Path, default=None)
@@ -143,9 +149,13 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--wandb", action="store_true", help="Log metrics to W&B")
     args = parser.parse_args()
 
+    root = args.data_root
+    if root is None:
+        root = Path.home() / f".cache/otxlearner/{args.data}"
     evaluate(
-        args.data_root,
+        root,
         args.model,
+        data=args.data,
         batch_size=args.batch_size,
         epsilon=args.epsilon,
         csv_path=args.csv,

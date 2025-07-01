@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 
+from .utils import download
+
 __all__ = ["IHDPSplit", "IHDPDataset", "load_ihdp"]
 
 URL_TRAIN = "https://www.fredjo.com/files/ihdp_npci_1-100.train.npz"
 URL_TEST = "https://www.fredjo.com/files/ihdp_npci_1-100.test.npz"
+SHA_TRAIN = "750697c71b4f8d7a3aafff771b56a4ac4cd83ec649bf69afb04f8a5aee41a240"
+SHA_TEST = "a70a8acbcc4e8deb677cc9bf9e9dabeb17caaa37cdbb1d7ba06be7ffb929c41c"
 
 
 @dataclass
@@ -30,12 +33,8 @@ class IHDPDataset:
     test: IHDPSplit
 
 
-def _download(url: str, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        return
-    with urllib.request.urlopen(url) as resp:
-        dest.write_bytes(resp.read())
+def _download(url: str, dest: Path, sha: str) -> None:
+    download(url, dest, sha256=sha)
 
 
 def _load_npz(path: Path) -> dict[str, npt.NDArray[np.float64]]:
@@ -56,6 +55,7 @@ def _flatten(features: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
 def load_ihdp(
     root: str | Path = Path.home() / ".cache" / "otxlearner" / "ihdp",
     *,
+    validate: bool | None = None,
     val_fraction: float = 0.1,
     seed: int = 42,
 ) -> IHDPDataset:
@@ -63,8 +63,12 @@ def load_ihdp(
     root = Path(root)
     train_path = root / "ihdp_npci_1-100.train.npz"
     test_path = root / "ihdp_npci_1-100.test.npz"
-    _download(URL_TRAIN, train_path)
-    _download(URL_TEST, test_path)
+    if validate is None:
+        validate = root == Path.home() / ".cache" / "otxlearner" / "ihdp"
+    if not train_path.exists() or validate:
+        _download(URL_TRAIN, train_path, SHA_TRAIN)
+    if not test_path.exists() or validate:
+        _download(URL_TEST, test_path, SHA_TEST)
 
     train_npz = _load_npz(train_path)
     test_npz = _load_npz(test_path)
