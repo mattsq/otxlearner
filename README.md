@@ -15,6 +15,10 @@ train/val/test splits. By default data are cached under `~/.cache/otxlearner/ihd
 `y1`. It returns deterministic train/val/test splits and caches the dataset under
 `~/.cache/otxlearner/twins`.
 
+`load_acic()` expects an `acic.npz` archive with arrays `x`, `t`, `y0`, and
+`y1`. By default data are cached under `~/.cache/otxlearner/acic` and the
+function returns deterministic train/val/test splits.
+
 ## Quick start
 
 Install the required packages and run a short training session on IHDP. The
