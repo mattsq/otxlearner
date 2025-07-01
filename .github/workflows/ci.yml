@@ -33,9 +33,9 @@ jobs:
         run: python -m pip install uv
       - name: Install dependencies
         run: |
-          uv pip install -r requirements.txt
-          uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-          uv pip install geomloss pytest
+          uv pip install --system -r requirements.txt
+          uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
+          uv pip install --system geomloss pytest
       - name: Prepare dataset
         run: |
           python - <<'PY'
@@ -86,9 +86,9 @@ jobs:
         run: python -m pip install uv
       - name: Install dependencies
         run: |
-          uv pip install -r requirements.txt
-          uv pip install torch --index-url https://download.pytorch.org/whl/cu118
-          uv pip install geomloss pytest
+          uv pip install --system -r requirements.txt
+          uv pip install --system torch --index-url https://download.pytorch.org/whl/cu118
+          uv pip install --system geomloss pytest
       - name: Prepare dataset
         run: |
           python - <<'PY'
