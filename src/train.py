@@ -16,6 +16,7 @@ import numpy.typing as npt
 
 from .data import IHDPDataset, IHDPSplit, load_ihdp
 from .models import MLPEncoder, Sinkhorn
+from .utils import cross_fit_propensity
 
 
 @dataclass
@@ -27,6 +28,7 @@ class TorchSplit(torch.utils.data.Dataset[tuple[torch.Tensor, ...]]):
     yf: torch.Tensor
     mu0: torch.Tensor
     mu1: torch.Tensor
+    e: torch.Tensor
 
     def __len__(self) -> int:  # pragma: no cover - trivial
         return self.x.shape[0]
@@ -38,6 +40,7 @@ class TorchSplit(torch.utils.data.Dataset[tuple[torch.Tensor, ...]]):
             self.yf[idx],
             self.mu0[idx],
             self.mu1[idx],
+            self.e[idx],
         )
 
 
@@ -52,19 +55,37 @@ def _to_tensor(x: torch.Tensor | npt.NDArray[np.float64]) -> torch.Tensor:
     return torch.as_tensor(x, dtype=torch.float32)
 
 
-def torchify(ds: IHDPDataset) -> TorchIHDP:
+def torchify(
+    ds: IHDPDataset,
+    propensities: (
+        tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]
+        | None
+    ) = None,
+) -> TorchIHDP:
     """Convert numpy IHDP dataset to PyTorch tensors."""
 
-    def convert(split: IHDPSplit) -> TorchSplit:
+    def convert(split: IHDPSplit, e: npt.NDArray[np.float64]) -> TorchSplit:
         return TorchSplit(
             _to_tensor(split.x),
             _to_tensor(split.t),
             _to_tensor(split.yf),
             _to_tensor(split.mu0),
             _to_tensor(split.mu1),
+            _to_tensor(e),
         )
 
-    return TorchIHDP(convert(ds.train), convert(ds.val), convert(ds.test))
+    if propensities is None:
+        zeros_train = np.zeros(len(ds.train.x), dtype=np.float64)
+        zeros_val = np.zeros(len(ds.val.x), dtype=np.float64)
+        zeros_test = np.zeros(len(ds.test.x), dtype=np.float64)
+        propensities = (zeros_train, zeros_val, zeros_test)
+
+    e_train, e_val, e_test = propensities
+    return TorchIHDP(
+        convert(ds.train, e_train),
+        convert(ds.val, e_val),
+        convert(ds.test, e_test),
+    )
 
 
 def cosine_warmup_lambda(
@@ -98,14 +119,28 @@ def train(
     patience: int = 5,
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
-) -> None:
-    """Train the baseline model on IHDP."""
+    seed: int = 42,
+) -> list[float]:
+    """Train the baseline model on IHDP and return validation metrics."""
 
     device = torch.device(device)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     ds_np = load_ihdp(root)
-    ds = torchify(ds_np)
+    x_all = np.concatenate([ds_np.train.x, ds_np.val.x, ds_np.test.x])
+    t_all = np.concatenate([ds_np.train.t, ds_np.val.t, ds_np.test.t])
+    e_all = cross_fit_propensity(x_all, t_all, n_splits=5, seed=seed)
+    n_tr = ds_np.train.x.shape[0]
+    n_val = ds_np.val.x.shape[0]
+    e_train = e_all[:n_tr]
+    e_val = e_all[n_tr : n_tr + n_val]
+    e_test = e_all[n_tr + n_val :]
+    ds = torchify(ds_np, (e_train, e_val, e_test))
 
-    train_loader = DataLoader(ds.train, batch_size=batch_size, shuffle=True)
+    generator = torch.Generator(device="cpu").manual_seed(seed)
+    train_loader = DataLoader(
+        ds.train, batch_size=batch_size, shuffle=True, generator=generator
+    )
     val_loader = DataLoader(ds.val, batch_size=batch_size)
 
     model = MLPEncoder(ds.train.x.shape[1]).to(device)
@@ -119,6 +154,7 @@ def train(
 
     best_metric = float("inf")
     epochs_without_improve = 0
+    val_history: list[float] = []
 
     for epoch in range(epochs):
         lam = schedule(epoch)
@@ -126,15 +162,15 @@ def train(
         writer.add_scalar("epsilon", epsilon, epoch)  # type: ignore[no-untyped-call]
         model.train()
         running_loss = 0.0
-        for x, t, yf, mu0, mu1 in train_loader:
-            x, t, yf, mu0, mu1 = (
+        for x, t, yf, mu0, mu1, e in train_loader:
+            x, t, yf, mu0, mu1, e = (
                 x.to(device),
                 t.to(device),
                 yf.to(device),
                 mu0.to(device),
                 mu1.to(device),
+                e.to(device),
             )
-            tau_true = mu1 - mu0
             optim.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast():
                 feats = model.net(x)
@@ -142,7 +178,9 @@ def train(
                 tau = model.tau_head(feats).squeeze(-1)
                 y_pred = outcome + t * tau
                 factual_loss = nn.functional.mse_loss(y_pred, yf)
-                tau_loss = nn.functional.mse_loss(tau, tau_true)
+                mu1_hat = outcome + tau
+                d_hat = t * (yf - outcome) / e + (1 - t) * (mu1_hat - yf) / (1 - e)
+                tau_loss = nn.functional.mse_loss(tau, d_hat)
                 feats_t = feats[t.bool()]
                 feats_c = feats[~t.bool()]
                 if len(feats_t) > 0 and len(feats_c) > 0:
@@ -168,18 +206,23 @@ def train(
         tau_preds: list[torch.Tensor] = []
         tau_targets: list[torch.Tensor] = []
         with torch.no_grad():
-            for x, t, yf, mu0, mu1 in val_loader:
-                x, t, mu0, mu1 = (
+            for x, t, yf, mu0, mu1, e in val_loader:
+                x, t, yf, mu0, mu1, e = (
                     x.to(device),
                     t.to(device),
+                    yf.to(device),
                     mu0.to(device),
                     mu1.to(device),
+                    e.to(device),
                 )
                 tau_true = mu1 - mu0
                 feats = model.net(x)
                 tau = model.tau_head(feats).squeeze(-1)
+                outcome = model.outcome_head(feats).squeeze(-1)
+                mu1_hat = outcome + tau
+                d_hat = t * (yf - outcome) / e + (1 - t) * (mu1_hat - yf) / (1 - e)
                 val_tau_err += nn.functional.mse_loss(
-                    tau, tau_true, reduction="sum"
+                    tau, d_hat, reduction="sum"
                 ).item()
                 feats_t = feats[t.bool()]
                 feats_c = feats[~t.bool()]
@@ -191,6 +234,7 @@ def train(
         val_mse = val_tau_err / len(ds.val)
         val_bal /= len(ds.val)
         val_metric = val_mse + 0.1 * val_bal
+        val_history.append(val_metric)
         writer.add_scalar("val_PEHE_proxy", val_metric, epoch)  # type: ignore[no-untyped-call]
         writer.add_scalar("val_mse", val_mse, epoch)  # type: ignore[no-untyped-call]
         writer.add_scalar("val_bal", val_bal, epoch)  # type: ignore[no-untyped-call]
@@ -211,6 +255,8 @@ def train(
                 break
 
     writer.close()  # type: ignore[no-untyped-call]
+
+    return val_history
 
 
 def main() -> None:  # pragma: no cover - CLI wrapper
