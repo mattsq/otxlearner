@@ -36,11 +36,12 @@ jobs:
           uv pip install --system -r requirements.txt
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
           uv pip install --system geomloss pytest
+          pip install -e .
       - name: Prepare dataset
         run: |
           python - <<'PY'
           from pathlib import Path
-          from src.data import load_ihdp
+          from otxlearner.data import load_ihdp
           load_ihdp(Path('$IHDP_DATA'))
           PY
       - name: Ruff
@@ -89,11 +90,12 @@ jobs:
           uv pip install --system -r requirements.txt
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cu118
           uv pip install --system geomloss pytest
+          pip install -e .
       - name: Prepare dataset
         run: |
           python - <<'PY'
           from pathlib import Path
-          from src.data import load_ihdp
+          from otxlearner.data import load_ihdp
           load_ihdp(Path('$IHDP_DATA'))
           PY
       - name: Ruff

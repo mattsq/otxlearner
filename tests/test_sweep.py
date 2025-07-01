@@ -1,9 +1,6 @@
 from pathlib import Path
-import sys
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from src.sweep import run_study
+from otxlearner.sweep import run_study
 
 
 def test_sweep_runs_one_trial(ihdp_root: Path) -> None:
