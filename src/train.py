@@ -20,7 +20,7 @@ from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
 
 from .data import IHDPDataset, IHDPSplit, load_ihdp
-from .models import MLPEncoder, Sinkhorn
+from .models import MLPEncoder, Sinkhorn, FlowEncoder
 from .utils import cross_fit_propensity
 
 _wandb: Optional[ModuleType]
@@ -80,6 +80,7 @@ class TrainConfig:
     wandb: bool = False
     depth: int = 3
     width: int = 64
+    encoder: str = "mlp"
 
 
 cs = ConfigStore.instance()
@@ -154,6 +155,7 @@ def train(
     patience: int = 5,
     depth: int = 3,
     width: int = 64,
+    encoder: str = "mlp",
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
     seed: int = 42,
@@ -183,7 +185,13 @@ def train(
     val_loader = DataLoader(ds.val, batch_size=batch_size)
 
     hidden = None if (width == 64 and depth == 3) else [width] * depth
-    model = MLPEncoder(ds.train.x.shape[1], hidden_sizes=hidden).to(device)
+    model: nn.Module
+    if encoder == "flow":
+        model = FlowEncoder(ds.train.x.shape[1], n_flows=depth, hidden_dim=width).to(
+            device
+        )
+    else:
+        model = MLPEncoder(ds.train.x.shape[1], hidden_sizes=hidden).to(device)
     sinkhorn = Sinkhorn(blur=epsilon).to(device)
     optim = torch.optim.Adam(model.parameters(), lr=lr)
     scaler = torch.cuda.amp.GradScaler()
@@ -204,6 +212,7 @@ def train(
                 "seed": seed,
                 "depth": depth,
                 "width": width,
+                "encoder": encoder,
             },
         )
 
@@ -230,9 +239,15 @@ def train(
             )
             optim.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast():
-                feats = model.net(x)
-                outcome = model.outcome_head(feats).squeeze(-1)
-                tau = model.tau_head(feats).squeeze(-1)
+                if isinstance(model, FlowEncoder):
+                    feats = model.flow(x)
+                    outcome = model.outcome_head(feats).squeeze(-1)
+                    tau = model.tau_head(feats).squeeze(-1)
+                else:
+                    assert isinstance(model, MLPEncoder)
+                    feats = model.net(x)
+                    outcome = model.outcome_head(feats).squeeze(-1)
+                    tau = model.tau_head(feats).squeeze(-1)
                 y_pred = outcome + t * tau
                 factual_loss = nn.functional.mse_loss(y_pred, yf)
                 mu1_hat = outcome + tau
@@ -275,9 +290,15 @@ def train(
                     e.to(device),
                 )
                 tau_true = mu1 - mu0
-                feats = model.net(x)
-                tau = model.tau_head(feats).squeeze(-1)
-                outcome = model.outcome_head(feats).squeeze(-1)
+                if isinstance(model, FlowEncoder):
+                    feats = model.flow(x)
+                    tau = model.tau_head(feats).squeeze(-1)
+                    outcome = model.outcome_head(feats).squeeze(-1)
+                else:
+                    assert isinstance(model, MLPEncoder)
+                    feats = model.net(x)
+                    tau = model.tau_head(feats).squeeze(-1)
+                    outcome = model.outcome_head(feats).squeeze(-1)
                 mu1_hat = outcome + tau
                 d_hat = t * (yf - outcome) / e + (1 - t) * (mu1_hat - yf) / (1 - e)
                 val_tau_err += nn.functional.mse_loss(
@@ -340,6 +361,7 @@ def train_from_config(cfg: TrainConfig) -> list[float]:
         patience=cfg.patience,
         depth=cfg.depth,
         width=cfg.width,
+        encoder=cfg.encoder,
         device=cfg.device,
         log_dir=cfg.log_dir,
         seed=cfg.seed,
@@ -361,6 +383,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--width", type=int, default=64)
+    parser.add_argument("--encoder", type=str, default="mlp", choices=["mlp", "flow"])
     parser.add_argument("--log-dir", type=Path, default=None)
     parser.add_argument("--wandb", action="store_true", help="Log metrics to W&B")
 
@@ -387,6 +410,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             patience=args.patience,
             depth=args.depth,
             width=args.width,
+            encoder=args.encoder,
             log_dir=args.log_dir,
             wandb_log=args.wandb,
         )
