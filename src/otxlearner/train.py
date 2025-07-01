@@ -23,6 +23,7 @@ from .data import IHDPDataset, IHDPSplit, load_ihdp
 from .models import (
     MLPEncoder,
     Sinkhorn,
+    UnbalancedSinkhorn,
     FlowEncoder,
     GradientReversal,
     DomainDiscriminator,
@@ -88,6 +89,7 @@ class TrainConfig:
     width: int = 64
     encoder: str = "mlp"
     dann: bool = False
+    unbalanced: bool = False
 
 
 cs = ConfigStore.instance()
@@ -164,6 +166,7 @@ def train(
     width: int = 64,
     encoder: str = "mlp",
     dann: bool = False,
+    unbalanced: bool = False,
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
     seed: int = 42,
@@ -205,7 +208,14 @@ def train(
     else:
         model = MLPEncoder(ds.train.x.shape[1], hidden_sizes=hidden).to(device)
     feat_dim = model.tau_head.in_features
-    sinkhorn = Sinkhorn(blur=epsilon).to(device) if not dann else None
+    sinkhorn: Sinkhorn | UnbalancedSinkhorn | None
+    if not dann:
+        if unbalanced:
+            sinkhorn = UnbalancedSinkhorn(blur=epsilon).to(device)
+        else:
+            sinkhorn = Sinkhorn(blur=epsilon).to(device)
+    else:
+        sinkhorn = None
     discriminator: DomainDiscriminator | None = None
     grl = GradientReversal()
     params: list[nn.Parameter] = list(model.parameters())
@@ -233,6 +243,7 @@ def train(
                 "width": width,
                 "encoder": encoder,
                 "dann": dann,
+                "unbalanced": unbalanced,
             },
         )
 
@@ -398,6 +409,7 @@ def train_from_config(cfg: TrainConfig) -> list[float]:
         width=cfg.width,
         encoder=cfg.encoder,
         dann=cfg.dann,
+        unbalanced=cfg.unbalanced,
         device=cfg.device,
         log_dir=cfg.log_dir,
         seed=cfg.seed,
@@ -423,6 +435,11 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--log-dir", type=Path, default=None)
     parser.add_argument(
         "--dann", action="store_true", help="Use DANN instead of Sinkhorn"
+    )
+    parser.add_argument(
+        "--unbalanced",
+        action="store_true",
+        help="Use unbalanced Sinkhorn penalty",
     )
     parser.add_argument("--wandb", action="store_true", help="Log metrics to W&B")
 
@@ -451,6 +468,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             width=args.width,
             encoder=args.encoder,
             dann=args.dann,
+            unbalanced=args.unbalanced,
             log_dir=args.log_dir,
             wandb_log=args.wandb,
         )
