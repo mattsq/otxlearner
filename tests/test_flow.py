@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-import sys
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
 import torch
-from src.models.flow import FlowEncoder, RealNVP
+from otxlearner.models.flow import FlowEncoder, RealNVP
 
 
 def test_flow_encoder_shapes() -> None:

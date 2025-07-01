@@ -3,10 +3,8 @@ from __future__ import annotations
 import numpy as np
 
 from pathlib import Path
-import sys
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-from src.data import load_ihdp
+from otxlearner.data import load_ihdp
 
 
 def test_ihdp_deterministic(ihdp_root: Path) -> None:
