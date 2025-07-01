@@ -38,3 +38,8 @@ python src/evaluate.py model.pt --data-root ~/.cache/otxlearner/ihdp \
 
 The [training_curves.ipynb](notebooks/training_curves.ipynb) notebook shows how
 to visualise the TensorBoard logs produced during training.
+
+## Experiment tracking
+
+Set the `WANDB_API_KEY` environment variable or run `wandb login` to enable
+Weights & Biases logging via `--wandb` on the train and evaluate scripts.

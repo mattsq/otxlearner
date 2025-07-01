@@ -7,6 +7,7 @@ import csv
 from pathlib import Path
 from types import ModuleType
 from typing import Optional
+import importlib
 
 import torch
 from torch import nn
@@ -16,6 +17,13 @@ from .data import load_ihdp
 from .models import MLPEncoder, Sinkhorn
 from .train import torchify
 from .utils import ate, pehe
+
+_wandb: Optional[ModuleType]
+try:  # pragma: no cover - optional dependency
+    _wandb = importlib.import_module("wandb")
+except Exception:
+    _wandb = None
+wandb: Optional[ModuleType] = _wandb
 
 
 def evaluate(
@@ -27,10 +35,14 @@ def evaluate(
     device: str | torch.device = "cpu",
     csv_path: str | Path | None = None,
     plot_file: str | Path | None = None,
+    wandb_log: bool = False,
+    wandb_project: str = "otxlearner",
 ) -> dict[str, float]:
     """Run evaluation on the IHDP test split."""
 
     device = torch.device(device)
+    if wandb_log and wandb is not None:
+        wandb.init(project=wandb_project, job_type="evaluation")
     ds_np = load_ihdp(data_root)
     ds = torchify(ds_np)
     loader = DataLoader(ds.test, batch_size=batch_size)
@@ -104,6 +116,17 @@ def evaluate(
             plt.savefig(plot_file)
             plt.close()
 
+    if wandb_log and wandb is not None:
+        wandb.log(
+            {
+                "mse": mse,
+                "balance": bal,
+                "pehe": metrics["pehe"],
+                "ate_error": metrics["ate_error"],
+            }
+        )
+        wandb.finish()
+
     return metrics
 
 
@@ -117,6 +140,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--epsilon", type=float, default=0.05)
     parser.add_argument("--csv", type=Path, default=None)
     parser.add_argument("--plot", type=Path, default=None)
+    parser.add_argument("--wandb", action="store_true", help="Log metrics to W&B")
     args = parser.parse_args()
 
     evaluate(
@@ -126,6 +150,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
         epsilon=args.epsilon,
         csv_path=args.csv,
         plot_file=args.plot,
+        wandb_log=args.wandb,
     )
 
 
