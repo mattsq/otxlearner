@@ -1,12 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-from pathlib import Path
-import sys
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from src.utils import cross_fit_propensity
+from otxlearner.utils import cross_fit_propensity
 
 
 def test_crossfit_deterministic() -> None:

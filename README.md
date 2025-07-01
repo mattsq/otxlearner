@@ -4,7 +4,7 @@ This project implements a Sinkhorn-penalised X-Net architecture for causal infer
 Refer to `Prompt.md` for the full research notes.
 
 This repository currently contains a minimal project skeleton. Code lives under
-`src/`, configurations under `configs/`, and tests under `tests/`.
+`src/otxlearner`, configurations under `configs/`, and tests under `tests/`.
 
 ## Dataset loaders
 
@@ -27,12 +27,13 @@ dataset is downloaded automatically on first use.
 ```bash
 python -m pip install torch geomloss  # plus other deps in requirements.txt
 python -m pip install -r requirements.txt
+python -m pip install -e .
 
 # train for a few epochs and log metrics under `runs/ihdp`
-python src/train.py --epochs 5 --log-dir runs/ihdp
+python -m otxlearner.train --epochs 5 --log-dir runs/ihdp
 
 # evaluate a saved checkpoint (if you saved `model.pt` during training)
-python src/evaluate.py model.pt --data-root ~/.cache/otxlearner/ihdp \
+python -m otxlearner.evaluate model.pt --data-root ~/.cache/otxlearner/ihdp \
     --csv results.csv --plot results.png
 ```
 

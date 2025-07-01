@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from src.train import train
+from otxlearner.train import train
 
 
 def test_train_dann_smoke(ihdp_root: Path) -> None:

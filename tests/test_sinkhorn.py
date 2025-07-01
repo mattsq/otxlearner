@@ -1,12 +1,7 @@
 from __future__ import annotations
-import os
-import sys
-
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-
 import torch
 
-from src.models.sinkhorn import Sinkhorn
+from otxlearner.models.sinkhorn import Sinkhorn
 
 
 def test_sinkhorn_forward_shape() -> None:

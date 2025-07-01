@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 import torch
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from src.utils.metrics import ate, pehe
+from otxlearner.utils.metrics import ate, pehe
 
 
 def test_pehe() -> None:
