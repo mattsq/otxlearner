@@ -14,6 +14,9 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import numpy.typing as npt
 
+from hydra import compose, initialize
+from hydra.core.config_store import ConfigStore
+
 from .data import IHDPDataset, IHDPSplit, load_ihdp
 from .models import MLPEncoder, Sinkhorn
 from .utils import cross_fit_propensity
@@ -49,6 +52,26 @@ class TorchIHDP:
     train: TorchSplit
     val: TorchSplit
     test: TorchSplit
+
+
+@dataclass
+class TrainConfig:
+    """Configuration for :func:`train`."""
+
+    data_root: Path = Path.home() / ".cache/otxlearner/ihdp"
+    epochs: int = 5
+    batch_size: int = 512
+    lr: float = 1e-3
+    lambda_max: float = 1.0
+    epsilon: float = 0.05
+    patience: int = 5
+    device: str = "cpu"
+    log_dir: Path | None = None
+    seed: int = 42
+
+
+cs = ConfigStore.instance()
+cs.store(name="base", node=TrainConfig)
 
 
 def _to_tensor(x: torch.Tensor | npt.NDArray[np.float64]) -> torch.Tensor:
@@ -259,8 +282,26 @@ def train(
     return val_history
 
 
+def train_from_config(cfg: TrainConfig) -> list[float]:
+    """Train using a :class:`TrainConfig`."""
+
+    return train(
+        cfg.data_root,
+        epochs=cfg.epochs,
+        batch_size=cfg.batch_size,
+        lr=cfg.lr,
+        lambda_max=cfg.lambda_max,
+        epsilon=cfg.epsilon,
+        patience=cfg.patience,
+        device=cfg.device,
+        log_dir=cfg.log_dir,
+        seed=cfg.seed,
+    )
+
+
 def main() -> None:  # pragma: no cover - CLI wrapper
     parser = argparse.ArgumentParser(description="Train baseline on IHDP")
+    parser.add_argument("--config", type=Path, default=None, help="Hydra config file")
     parser.add_argument(
         "--data-root", type=Path, default=Path.home() / ".cache/otxlearner/ihdp"
     )
@@ -271,18 +312,30 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--epsilon", type=float, default=0.05)
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--log-dir", type=Path, default=None)
-    args = parser.parse_args()
 
-    train(
-        args.data_root,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        lambda_max=args.lambda_max,
-        epsilon=args.epsilon,
-        patience=args.patience,
-        log_dir=args.log_dir,
-    )
+    args, unknown = parser.parse_known_args()
+
+    if args.config is not None:
+        config_path = args.config.resolve()
+        # remove --config from sys.argv so Hydra can parse remaining overrides
+        import sys
+
+        idx = sys.argv.index("--config")
+        del sys.argv[idx : idx + 2]
+        with initialize(config_path=str(config_path.parent), version_base=None):
+            cfg = compose(config_name=config_path.stem, overrides=unknown)
+        train_from_config(cfg)  # type: ignore[arg-type]
+    else:
+        train(
+            args.data_root,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            lambda_max=args.lambda_max,
+            epsilon=args.epsilon,
+            patience=args.patience,
+            log_dir=args.log_dir,
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI

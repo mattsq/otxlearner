@@ -1,0 +1,10 @@
+data_root: ~/.cache/otxlearner/ihdp
+epochs: 5
+batch_size: 512
+lr: 0.001
+lambda_max: 1.0
+epsilon: 0.05
+patience: 5
+log_dir: null
+device: cpu
+seed: 42
