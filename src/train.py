@@ -119,14 +119,17 @@ def train(
     patience: int = 5,
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
+    seed: int = 42,
 ) -> list[float]:
     """Train the baseline model on IHDP and return validation metrics."""
 
     device = torch.device(device)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     ds_np = load_ihdp(root)
     x_all = np.concatenate([ds_np.train.x, ds_np.val.x, ds_np.test.x])
     t_all = np.concatenate([ds_np.train.t, ds_np.val.t, ds_np.test.t])
-    e_all = cross_fit_propensity(x_all, t_all, n_splits=5, seed=42)
+    e_all = cross_fit_propensity(x_all, t_all, n_splits=5, seed=seed)
     n_tr = ds_np.train.x.shape[0]
     n_val = ds_np.val.x.shape[0]
     e_train = e_all[:n_tr]
@@ -134,7 +137,10 @@ def train(
     e_test = e_all[n_tr + n_val :]
     ds = torchify(ds_np, (e_train, e_val, e_test))
 
-    train_loader = DataLoader(ds.train, batch_size=batch_size, shuffle=True)
+    generator = torch.Generator(device="cpu").manual_seed(seed)
+    train_loader = DataLoader(
+        ds.train, batch_size=batch_size, shuffle=True, generator=generator
+    )
     val_loader = DataLoader(ds.val, batch_size=batch_size)
 
     model = MLPEncoder(ds.train.x.shape[1]).to(device)

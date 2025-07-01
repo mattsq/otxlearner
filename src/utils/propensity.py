@@ -17,7 +17,7 @@ def cross_fit_propensity(
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
     e_hat = np.zeros_like(t, dtype=np.float64)
     for train_idx, test_idx in kf.split(x):
-        model = LogisticRegression(max_iter=1000)
+        model = LogisticRegression(max_iter=1000, random_state=seed)
         model.fit(x[train_idx], t[train_idx])
         e_hat[test_idx] = model.predict_proba(x[test_idx])[:, 1]
     return np.clip(e_hat, clip, 1.0 - clip)
