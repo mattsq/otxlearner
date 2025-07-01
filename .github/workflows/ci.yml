@@ -51,7 +51,7 @@ jobs:
       - name: Mypy
         run: mypy --strict src
       - name: Pytest
-        run: pytest -vv
+        run: pytest -vv --cov=otxlearner --cov-report=term --cov-fail-under=80
 
   cuda:
     runs-on: ubuntu-latest
@@ -105,5 +105,5 @@ jobs:
       - name: Mypy
         run: mypy --strict src
       - name: Pytest
-        run: pytest -vv
+        run: pytest -vv --cov=otxlearner --cov-report=term --cov-fail-under=80
 
