@@ -47,7 +47,7 @@ def evaluate(
     tau_preds: list[torch.Tensor] = []
     tau_targets: list[torch.Tensor] = []
     with torch.no_grad():
-        for x, t, _yf, mu0, mu1 in loader:
+        for x, t, _yf, mu0, mu1, _e in loader:
             x, t, mu0, mu1 = (
                 x.to(device),
                 t.to(device),
