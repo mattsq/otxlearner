@@ -10,7 +10,7 @@ This repository explores a "Sinkhorn-penalised X-Net" for causal inference. The 
 
 ## Suggested repository layout
 ```
-src/
+src/otxlearner/
     data/
     models/
     train.py
@@ -29,6 +29,7 @@ Maintain future contributions in this structure.
 - Format and lint with **ruff**, **black**, and **mypy --strict**. Always run
   `ruff check src tests`, `black --check src tests`, `mypy --strict src` and
   `pytest -vv` locally before committing so the checks match CI.
+- Install the package in editable mode via `pip install -e .` before running tests.
 - Add unit tests for each component, including a one‑epoch IHDP smoke test.
 - Provide GitHub Actions CI for Python 3.10 and 3.11 on CPU and CUDA 11.8.
 - Log λ, ε, PEHE and ATE via MLflow or Weights & Biases.
