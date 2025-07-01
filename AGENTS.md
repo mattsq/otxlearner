@@ -26,7 +26,9 @@ Makefile
 Maintain future contributions in this structure.
 
 ## Development practices
-- Format and lint with **ruff**, **black**, and **mypy --strict**.
+- Format and lint with **ruff**, **black**, and **mypy --strict**. Always run
+  `ruff check src tests`, `black --check src tests`, `mypy --strict src` and
+  `pytest -vv` locally before committing so the checks match CI.
 - Add unit tests for each component, including a one‑epoch IHDP smoke test.
 - Provide GitHub Actions CI for Python 3.10 and 3.11 on CPU and CUDA 11.8.
 - Log λ, ε, PEHE and ATE via MLflow or Weights & Biases.
