@@ -20,7 +20,13 @@ from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
 
 from .data import IHDPDataset, IHDPSplit, load_ihdp
-from .models import MLPEncoder, Sinkhorn, FlowEncoder
+from .models import (
+    MLPEncoder,
+    Sinkhorn,
+    FlowEncoder,
+    GradientReversal,
+    DomainDiscriminator,
+)
 from .utils import cross_fit_propensity
 
 _wandb: Optional[ModuleType]
@@ -81,6 +87,7 @@ class TrainConfig:
     depth: int = 3
     width: int = 64
     encoder: str = "mlp"
+    dann: bool = False
 
 
 cs = ConfigStore.instance()
@@ -156,13 +163,18 @@ def train(
     depth: int = 3,
     width: int = 64,
     encoder: str = "mlp",
+    dann: bool = False,
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
     seed: int = 42,
     wandb_log: bool = False,
     wandb_project: str = "otxlearner",
 ) -> list[float]:
-    """Train the baseline model on IHDP and return validation metrics."""
+    """Train the baseline model on IHDP and return validation metrics.
+
+    When ``dann`` is ``True`` a domain-adversarial loss with a gradient
+    reversal layer replaces the Sinkhorn penalty.
+    """
 
     device = torch.device(device)
     torch.manual_seed(seed)
@@ -185,15 +197,22 @@ def train(
     val_loader = DataLoader(ds.val, batch_size=batch_size)
 
     hidden = None if (width == 64 and depth == 3) else [width] * depth
-    model: nn.Module
+    model: MLPEncoder | FlowEncoder
     if encoder == "flow":
         model = FlowEncoder(ds.train.x.shape[1], n_flows=depth, hidden_dim=width).to(
             device
         )
     else:
         model = MLPEncoder(ds.train.x.shape[1], hidden_sizes=hidden).to(device)
-    sinkhorn = Sinkhorn(blur=epsilon).to(device)
-    optim = torch.optim.Adam(model.parameters(), lr=lr)
+    feat_dim = model.tau_head.in_features
+    sinkhorn = Sinkhorn(blur=epsilon).to(device) if not dann else None
+    discriminator: DomainDiscriminator | None = None
+    grl = GradientReversal()
+    params: list[nn.Parameter] = list(model.parameters())
+    if dann:
+        discriminator = DomainDiscriminator(feat_dim, hidden_dim=width).to(device)
+        params += list(discriminator.parameters())
+    optim = torch.optim.Adam(params, lr=lr)
     scaler = torch.cuda.amp.GradScaler()
 
     schedule = cosine_warmup_lambda(lambda_max, epochs)
@@ -213,6 +232,7 @@ def train(
                 "depth": depth,
                 "width": width,
                 "encoder": encoder,
+                "dann": dann,
             },
         )
 
@@ -253,13 +273,20 @@ def train(
                 mu1_hat = outcome + tau
                 d_hat = t * (yf - outcome) / e + (1 - t) * (mu1_hat - yf) / (1 - e)
                 tau_loss = nn.functional.mse_loss(tau, d_hat)
-                feats_t = feats[t.bool()]
-                feats_c = feats[~t.bool()]
-                if len(feats_t) > 0 and len(feats_c) > 0:
-                    bal_loss = sinkhorn(feats_t, feats_c)
+                if dann:
+                    assert discriminator is not None
+                    dom_pred = discriminator(grl(feats, lam))
+                    bal_loss = nn.functional.cross_entropy(dom_pred, t.long())
+                    loss = factual_loss + tau_loss + bal_loss
                 else:
-                    bal_loss = torch.tensor(0.0, device=device)
-                loss = factual_loss + tau_loss + lam * bal_loss
+                    feats_t = feats[t.bool()]
+                    feats_c = feats[~t.bool()]
+                    if len(feats_t) > 0 and len(feats_c) > 0:
+                        assert sinkhorn is not None
+                        bal_loss = sinkhorn(feats_t, feats_c)
+                    else:
+                        bal_loss = torch.tensor(0.0, device=device)
+                    loss = factual_loss + tau_loss + lam * bal_loss
 
             scaler.scale(loss).backward()
             scaler.unscale_(optim)
@@ -304,10 +331,18 @@ def train(
                 val_tau_err += nn.functional.mse_loss(
                     tau, d_hat, reduction="sum"
                 ).item()
-                feats_t = feats[t.bool()]
-                feats_c = feats[~t.bool()]
-                if len(feats_t) > 0 and len(feats_c) > 0:
-                    val_bal += sinkhorn(feats_t, feats_c).item() * x.size(0)
+                if dann:
+                    assert discriminator is not None
+                    dom_pred = discriminator(feats)
+                    val_bal += nn.functional.cross_entropy(
+                        dom_pred, t.long(), reduction="sum"
+                    ).item()
+                else:
+                    feats_t = feats[t.bool()]
+                    feats_c = feats[~t.bool()]
+                    if len(feats_t) > 0 and len(feats_c) > 0:
+                        assert sinkhorn is not None
+                        val_bal += sinkhorn(feats_t, feats_c).item() * x.size(0)
                 tau_preds.append(tau)
                 tau_targets.append(tau_true)
 
@@ -362,6 +397,7 @@ def train_from_config(cfg: TrainConfig) -> list[float]:
         depth=cfg.depth,
         width=cfg.width,
         encoder=cfg.encoder,
+        dann=cfg.dann,
         device=cfg.device,
         log_dir=cfg.log_dir,
         seed=cfg.seed,
@@ -385,6 +421,9 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--encoder", type=str, default="mlp", choices=["mlp", "flow"])
     parser.add_argument("--log-dir", type=Path, default=None)
+    parser.add_argument(
+        "--dann", action="store_true", help="Use DANN instead of Sinkhorn"
+    )
     parser.add_argument("--wandb", action="store_true", help="Log metrics to W&B")
 
     args, unknown = parser.parse_known_args()
@@ -411,6 +450,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             depth=args.depth,
             width=args.width,
             encoder=args.encoder,
+            dann=args.dann,
             log_dir=args.log_dir,
             wandb_log=args.wandb,
         )
