@@ -11,6 +11,11 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+
+try:
+    import wandb  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    wandb = None
 import numpy as np
 import numpy.typing as npt
 
@@ -68,6 +73,7 @@ class TrainConfig:
     device: str = "cpu"
     log_dir: Path | None = None
     seed: int = 42
+    wandb: bool = False
 
 
 cs = ConfigStore.instance()
@@ -143,6 +149,8 @@ def train(
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
     seed: int = 42,
+    wandb_log: bool = False,
+    wandb_project: str = "otxlearner",
 ) -> list[float]:
     """Train the baseline model on IHDP and return validation metrics."""
 
@@ -174,6 +182,19 @@ def train(
     schedule = cosine_warmup_lambda(lambda_max, epochs)
 
     writer = SummaryWriter(log_dir=str(log_dir) if log_dir else None)  # type: ignore[no-untyped-call]
+    if wandb_log and wandb is not None:
+        wandb.init(
+            project=wandb_project,
+            config={
+                "epochs": epochs,
+                "batch_size": batch_size,
+                "lr": lr,
+                "lambda_max": lambda_max,
+                "epsilon": epsilon,
+                "patience": patience,
+                "seed": seed,
+            },
+        )
 
     best_metric = float("inf")
     epochs_without_improve = 0
@@ -183,6 +204,8 @@ def train(
         lam = schedule(epoch)
         writer.add_scalar("lambda", lam, epoch)  # type: ignore[no-untyped-call]
         writer.add_scalar("epsilon", epsilon, epoch)  # type: ignore[no-untyped-call]
+        if wandb_log and wandb is not None:
+            wandb.log({"lambda": lam, "epsilon": epsilon}, step=epoch)
         model.train()
         running_loss = 0.0
         for x, t, yf, mu0, mu1, e in train_loader:
@@ -221,6 +244,8 @@ def train(
 
         avg_loss = running_loss / len(ds.train)
         writer.add_scalar("train_loss", avg_loss, epoch)  # type: ignore[no-untyped-call]
+        if wandb_log and wandb is not None:
+            wandb.log({"train_loss": avg_loss}, step=epoch)
 
         # validation
         model.eval()
@@ -261,6 +286,11 @@ def train(
         writer.add_scalar("val_PEHE_proxy", val_metric, epoch)  # type: ignore[no-untyped-call]
         writer.add_scalar("val_mse", val_mse, epoch)  # type: ignore[no-untyped-call]
         writer.add_scalar("val_bal", val_bal, epoch)  # type: ignore[no-untyped-call]
+        if wandb_log and wandb is not None:
+            wandb.log(
+                {"val_PEHE_proxy": val_metric, "val_mse": val_mse, "val_bal": val_bal},
+                step=epoch,
+            )
 
         pehe = torch.sqrt(torch.tensor(val_mse)).item()
         ate_pred = torch.cat(tau_preds).mean().item()
@@ -268,6 +298,8 @@ def train(
         ate_err = ate_pred - ate_true
         writer.add_scalar("val_PEHE", pehe, epoch)  # type: ignore[no-untyped-call]
         writer.add_scalar("val_ATE_error", ate_err, epoch)  # type: ignore[no-untyped-call]
+        if wandb_log and wandb is not None:
+            wandb.log({"val_PEHE": pehe, "val_ATE": ate_pred}, step=epoch)
 
         if val_metric < best_metric:
             best_metric = val_metric
@@ -278,6 +310,8 @@ def train(
                 break
 
     writer.close()  # type: ignore[no-untyped-call]
+    if wandb_log and wandb is not None:
+        wandb.finish()
 
     return val_history
 
@@ -296,6 +330,7 @@ def train_from_config(cfg: TrainConfig) -> list[float]:
         device=cfg.device,
         log_dir=cfg.log_dir,
         seed=cfg.seed,
+        wandb_log=cfg.wandb,
     )
 
 
@@ -312,6 +347,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--epsilon", type=float, default=0.05)
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--log-dir", type=Path, default=None)
+    parser.add_argument("--wandb", action="store_true", help="Log metrics to W&B")
 
     args, unknown = parser.parse_known_args()
 
@@ -335,6 +371,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             epsilon=args.epsilon,
             patience=args.patience,
             log_dir=args.log_dir,
+            wandb_log=args.wandb,
         )
 
 
