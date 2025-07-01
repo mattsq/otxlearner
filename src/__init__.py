@@ -1,3 +1,3 @@
-from .models import MLPEncoder
+from .models import MLPEncoder, FlowEncoder
 
-__all__ = ["MLPEncoder"]
+__all__ = ["MLPEncoder", "FlowEncoder"]
