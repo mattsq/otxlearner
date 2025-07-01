@@ -78,6 +78,8 @@ class TrainConfig:
     log_dir: Path | None = None
     seed: int = 42
     wandb: bool = False
+    depth: int = 3
+    width: int = 64
 
 
 cs = ConfigStore.instance()
@@ -150,6 +152,8 @@ def train(
     lambda_max: float = 1.0,
     epsilon: float = 0.05,
     patience: int = 5,
+    depth: int = 3,
+    width: int = 64,
     device: str | torch.device = "cpu",
     log_dir: str | Path | None = None,
     seed: int = 42,
@@ -178,7 +182,8 @@ def train(
     )
     val_loader = DataLoader(ds.val, batch_size=batch_size)
 
-    model = MLPEncoder(ds.train.x.shape[1]).to(device)
+    hidden = None if (width == 64 and depth == 3) else [width] * depth
+    model = MLPEncoder(ds.train.x.shape[1], hidden_sizes=hidden).to(device)
     sinkhorn = Sinkhorn(blur=epsilon).to(device)
     optim = torch.optim.Adam(model.parameters(), lr=lr)
     scaler = torch.cuda.amp.GradScaler()
@@ -197,6 +202,8 @@ def train(
                 "epsilon": epsilon,
                 "patience": patience,
                 "seed": seed,
+                "depth": depth,
+                "width": width,
             },
         )
 
@@ -331,6 +338,8 @@ def train_from_config(cfg: TrainConfig) -> list[float]:
         lambda_max=cfg.lambda_max,
         epsilon=cfg.epsilon,
         patience=cfg.patience,
+        depth=cfg.depth,
+        width=cfg.width,
         device=cfg.device,
         log_dir=cfg.log_dir,
         seed=cfg.seed,
@@ -350,6 +359,8 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     parser.add_argument("--lambda-max", type=float, default=1.0)
     parser.add_argument("--epsilon", type=float, default=0.05)
     parser.add_argument("--patience", type=int, default=5)
+    parser.add_argument("--depth", type=int, default=3)
+    parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--log-dir", type=Path, default=None)
     parser.add_argument("--wandb", action="store_true", help="Log metrics to W&B")
 
@@ -374,6 +385,8 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             lambda_max=args.lambda_max,
             epsilon=args.epsilon,
             patience=args.patience,
+            depth=args.depth,
+            width=args.width,
             log_dir=args.log_dir,
             wandb_log=args.wandb,
         )

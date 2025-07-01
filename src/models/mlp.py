@@ -7,21 +7,22 @@ from torch import nn
 class MLPEncoder(nn.Module):
     """Simple MLP encoder with outcome and tau heads."""
 
-    def __init__(self, input_dim: int) -> None:
+    def __init__(self, input_dim: int, hidden_sizes: list[int] | None = None) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.LayerNorm(256),
-            nn.GELU(),
-            nn.Linear(256, 128),
-            nn.LayerNorm(128),
-            nn.GELU(),
-            nn.Linear(128, 64),
-            nn.LayerNorm(64),
-            nn.GELU(),
-        )
-        self.outcome_head = nn.Linear(64, 1)
-        self.tau_head = nn.Linear(64, 1)
+        if hidden_sizes is None:
+            hidden_sizes = [256, 128, 64]
+
+        layers: list[nn.Module] = []
+        in_dim = input_dim
+        for size in hidden_sizes:
+            layers.append(nn.Linear(in_dim, size))
+            layers.append(nn.LayerNorm(size))
+            layers.append(nn.GELU())
+            in_dim = size
+
+        self.net = nn.Sequential(*layers)
+        self.outcome_head = nn.Linear(in_dim, 1)
+        self.tau_head = nn.Linear(in_dim, 1)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         feats = self.net(x)
