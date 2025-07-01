@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 
+from .utils import download
+
 __all__ = ["TwinsSplit", "TwinsDataset", "load_twins"]
 
 URL = "https://example.com/twins.npz"
+SHA = "0000000000000000000000000000000000000000000000000000000000000000"
 
 
 @dataclass
@@ -29,12 +31,8 @@ class TwinsDataset:
     test: TwinsSplit
 
 
-def _download(url: str, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        return
-    with urllib.request.urlopen(url) as resp:
-        dest.write_bytes(resp.read())
+def _download(url: str, dest: Path, sha: str) -> None:
+    download(url, dest, sha256=sha)
 
 
 def _load_npz(path: Path) -> dict[str, npt.NDArray[np.float64]]:
@@ -45,13 +43,17 @@ def _load_npz(path: Path) -> dict[str, npt.NDArray[np.float64]]:
 def load_twins(
     root: str | Path = Path.home() / ".cache" / "otxlearner" / "twins",
     *,
+    validate: bool | None = None,
     val_fraction: float = 0.1,
     seed: int = 42,
 ) -> TwinsDataset:
     """Load Twins with deterministic train/val/test splits."""
     root = Path(root)
     path = root / "twins.npz"
-    _download(URL, path)
+    if validate is None:
+        validate = root == Path.home() / ".cache" / "otxlearner" / "twins"
+    if not path.exists() or validate:
+        _download(URL, path, SHA)
 
     data = _load_npz(path)
     x = np.asarray(data["x"])
