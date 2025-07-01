@@ -7,20 +7,23 @@ import csv
 from pathlib import Path
 from types import ModuleType
 from typing import Optional
+import importlib
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-try:
-    import wandb  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    wandb = None
-
 from .data import load_ihdp
 from .models import MLPEncoder, Sinkhorn
 from .train import torchify
 from .utils import ate, pehe
+
+_wandb: Optional[ModuleType]
+try:  # pragma: no cover - optional dependency
+    _wandb = importlib.import_module("wandb")
+except Exception:
+    _wandb = None
+wandb: Optional[ModuleType] = _wandb
 
 
 def evaluate(

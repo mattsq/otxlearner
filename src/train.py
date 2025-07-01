@@ -5,19 +5,16 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
+from types import ModuleType
+import importlib
 
+import numpy as np
+import numpy.typing as npt
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-
-try:
-    import wandb  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    wandb = None
-import numpy as np
-import numpy.typing as npt
 
 from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
@@ -25,6 +22,13 @@ from hydra.core.config_store import ConfigStore
 from .data import IHDPDataset, IHDPSplit, load_ihdp
 from .models import MLPEncoder, Sinkhorn
 from .utils import cross_fit_propensity
+
+_wandb: Optional[ModuleType]
+try:  # pragma: no cover - optional dependency
+    _wandb = importlib.import_module("wandb")
+except Exception:
+    _wandb = None
+wandb: Optional[ModuleType] = _wandb
 
 
 @dataclass
