@@ -1,0 +1,6 @@
+defaults:
+  - base
+  - _self_
+
+data: ihdp
+data_root: ~/.cache/otxlearner/ihdp

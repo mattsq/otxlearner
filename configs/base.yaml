@@ -1,3 +1,4 @@
+data: ihdp
 data_root: ~/.cache/otxlearner/ihdp
 epochs: 5
 batch_size: 512
