@@ -1,0 +1,1 @@
+"""Domain-adversarial trainer."""
