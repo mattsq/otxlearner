@@ -1,0 +1,6 @@
+defaults:
+  - base
+  - _self_
+
+data: acic
+data_root: ~/.cache/otxlearner/acic

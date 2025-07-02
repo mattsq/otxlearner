@@ -1,0 +1,6 @@
+defaults:
+  - base
+  - _self_
+
+data: twins
+data_root: ~/.cache/otxlearner/twins
