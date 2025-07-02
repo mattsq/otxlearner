@@ -1,45 +1,41 @@
-# OTX Learner
+# OTX Learner [![PyPI](https://img.shields.io/pypi/v/otxlearner.svg)](https://pypi.org/project/otxlearner/)
 
-This project implements a Sinkhorn-penalised X-Net architecture for causal inference.
-Refer to `Prompt.md` for the full research notes.
+OTX Learner is an experimental implementation of a **Sinkhorn‑penalised X‑Net** for counterfactual inference with PyTorch. It balances treated and control representations using an entropic optimal‑transport divergence rather than an adversarial critic.
 
-This repository currently contains a minimal project skeleton. Code lives under
-`src/otxlearner`, configurations under `configs/`, and tests under `tests/`.
+The code lives under `src/otxlearner` and includes dataset loaders, models and training scripts.
+
+```python
+from otxlearner.train import main
+
+# run a short IHDP experiment
+main(["--epochs", "5", "--log-dir", "runs/ihdp"])
+```
+
+See the [documentation](https://otxlearner.readthedocs.io/) for a quick-start guide, API reference and research notes.
 
 ## Dataset loaders
 
-`load_ihdp()` downloads the public IHDP benchmark and returns deterministic
-train/val/test splits. By default data are cached under `~/.cache/otxlearner/ihdp`.
+`load_ihdp()` downloads the public IHDP benchmark and returns deterministic train/val/test splits. By default data are cached under `~/.cache/otxlearner/ihdp`.
 
-`load_twins()` downloads the Twins benchmark if needed and returns deterministic
-train/val/test splits. By default data are cached under
-`~/.cache/otxlearner/twins`.
+`load_twins()` downloads the Twins benchmark if needed and returns deterministic train/val/test splits. By default data are cached under `~/.cache/otxlearner/twins`.
 
-`load_acic()` supports the ACIC 2016 and 2018 benchmarks. The dataset is
-downloaded on first use and cached under `~/.cache/otxlearner/acic`.
+`load_acic()` supports the ACIC 2016 and 2018 benchmarks. The dataset is downloaded on first use and cached under `~/.cache/otxlearner/acic`.
 
 ## Quick start
 
-Install the required packages and run a short training session on IHDP. The
-dataset is downloaded automatically on first use.
+Install the required packages and run a short training session on IHDP.
 
 ```bash
-python -m pip install torch geomloss  # plus other deps in requirements.txt
+python -m pip install torch geomloss
 python -m pip install -r requirements.txt
 python -m pip install -e .
 
-# train for a few epochs and log metrics under `runs/ihdp`
 python -m otxlearner.train --epochs 5 --log-dir runs/ihdp
-
-# evaluate a saved checkpoint (if you saved `model.pt` during training)
-python -m otxlearner.evaluate model.pt --data-root ~/.cache/otxlearner/ihdp \
-    --csv results.csv --plot results.png
 ```
 
-The [training_curves.ipynb](notebooks/training_curves.ipynb) notebook shows how
-to visualise the TensorBoard logs produced during training.
+The [training_curves.ipynb](notebooks/training_curves.ipynb) notebook shows how to visualise the TensorBoard logs produced during training.
 
 ## Experiment tracking
 
-Set the `WANDB_API_KEY` environment variable or run `wandb login` to enable
-Weights & Biases logging via `--wandb` on the train and evaluate scripts.
+Set the `WANDB_API_KEY` environment variable or run `wandb login` to enable Weights & Biases logging via `--wandb` on the train and evaluate scripts.
+

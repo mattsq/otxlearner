@@ -12,3 +12,10 @@ repos:
     hooks:
       - id: mypy
         args: ["--strict"]
+  - repo: local
+    hooks:
+      - id: mkdocs-build
+        name: mkdocs build
+        entry: mkdocs build --strict --quiet
+        language: system
+        files: "^(docs/|src/.*\.py$)"
