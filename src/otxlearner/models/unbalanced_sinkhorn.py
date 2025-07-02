@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import torch
 from torch import nn
-from typing import Callable, cast
+from typing import Callable, TYPE_CHECKING, cast
+
+if TYPE_CHECKING:  # pragma: no cover - hint-only imports
+    from jax.numpy import ndarray as Array  # type: ignore[import-not-found]
+else:  # pragma: no cover - runtime fallback
+    Array = torch.Tensor
 
 try:  # pragma: no cover - optional deps
     from jax2torch import jax2torch  # type: ignore[import-not-found]
     from ott.geometry import pointcloud, costs  # type: ignore[import-not-found]
     from ott.problems.linear import linear_problem  # type: ignore[import-not-found]
     from ott.solvers.linear import sinkhorn  # type: ignore[import-not-found]
-    from jax.numpy import ndarray as Array  # type: ignore[import-not-found]
 
     _HAS_JAX = True
 except Exception:  # pragma: no cover - optional deps
-    Array = torch.Tensor
     jax2torch = None
     _HAS_JAX = False
 
