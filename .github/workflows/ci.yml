@@ -35,7 +35,7 @@ jobs:
         run: |
           uv pip install --system -r requirements.txt
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
-          uv pip install --system geomloss pytest
+          uv pip install --system geomloss pytest pytest-cov
           pip install -e .
       - name: Prepare dataset
         run: |
@@ -51,7 +51,7 @@ jobs:
       - name: Mypy
         run: mypy --strict src
       - name: Pytest
-        run: pytest -vv
+        run: pytest -vv --cov=otxlearner --cov-report=term --cov-fail-under=80
 
   cuda:
     runs-on: ubuntu-latest
@@ -89,7 +89,7 @@ jobs:
         run: |
           uv pip install --system -r requirements.txt
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cu118
-          uv pip install --system geomloss pytest
+          uv pip install --system geomloss pytest pytest-cov
           pip install -e .
       - name: Prepare dataset
         run: |
@@ -105,5 +105,5 @@ jobs:
       - name: Mypy
         run: mypy --strict src
       - name: Pytest
-        run: pytest -vv
+        run: pytest -vv --cov=otxlearner --cov-report=term --cov-fail-under=80
 
