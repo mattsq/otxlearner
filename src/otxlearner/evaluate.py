@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from .data import load_ihdp, load_twins, load_acic
 from .data.types import DatasetProtocol
 from .models import MLPEncoder, Sinkhorn
-from .train import torchify
+from .data.torch_adapter import torchify
 from .utils import ate, pehe
 
 _wandb: Optional[ModuleType]

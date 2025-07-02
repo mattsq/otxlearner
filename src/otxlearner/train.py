@@ -5,12 +5,11 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, cast
+from typing import Optional, cast
 from types import ModuleType
 import importlib
 
 import numpy as np
-import numpy.typing as npt
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -20,7 +19,8 @@ from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
 
 from .data import load_ihdp, load_acic, load_twins
-from .data.types import DatasetProtocol, SplitProtocol
+from .data.types import DatasetProtocol
+from .data.torch_adapter import torchify
 from .models import (
     MLPEncoder,
     Sinkhorn,
@@ -30,6 +30,7 @@ from .models import (
     DomainDiscriminator,
 )
 from .utils import cross_fit_propensity
+from .schedulers import cosine_warmup_lambda
 
 _wandb: Optional[ModuleType]
 try:  # pragma: no cover - optional dependency
@@ -37,38 +38,6 @@ try:  # pragma: no cover - optional dependency
 except Exception:
     _wandb = None
 wandb: Optional[ModuleType] = _wandb
-
-
-@dataclass
-class TorchSplit(torch.utils.data.Dataset[tuple[torch.Tensor, ...]]):
-    """Torch dataset wrapper around :class:`IHDPSplit`."""
-
-    x: torch.Tensor
-    t: torch.Tensor
-    yf: torch.Tensor
-    mu0: torch.Tensor
-    mu1: torch.Tensor
-    e: torch.Tensor
-
-    def __len__(self) -> int:  # pragma: no cover - trivial
-        return self.x.shape[0]
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, ...]:
-        return (
-            self.x[idx],
-            self.t[idx],
-            self.yf[idx],
-            self.mu0[idx],
-            self.mu1[idx],
-            self.e[idx],
-        )
-
-
-@dataclass
-class TorchIHDP:
-    train: TorchSplit
-    val: TorchSplit
-    test: TorchSplit
 
 
 @dataclass
@@ -96,63 +65,6 @@ class TrainConfig:
 
 cs = ConfigStore.instance()
 cs.store(name="base", node=TrainConfig)
-
-
-def _to_tensor(x: torch.Tensor | npt.NDArray[np.float64]) -> torch.Tensor:
-    return torch.as_tensor(x, dtype=torch.float32)
-
-
-def torchify(
-    ds: DatasetProtocol,
-    propensities: (
-        tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]
-        | None
-    ) = None,
-) -> TorchIHDP:
-    """Convert numpy dataset to PyTorch tensors."""
-
-    def convert(split: SplitProtocol, e: npt.NDArray[np.float64]) -> TorchSplit:
-        return TorchSplit(
-            _to_tensor(split.x),
-            _to_tensor(split.t),
-            _to_tensor(split.yf),
-            _to_tensor(split.mu0),
-            _to_tensor(split.mu1),
-            _to_tensor(e),
-        )
-
-    if propensities is None:
-        zeros_train = np.zeros(len(ds.train.x), dtype=np.float64)
-        zeros_val = np.zeros(len(ds.val.x), dtype=np.float64)
-        zeros_test = np.zeros(len(ds.test.x), dtype=np.float64)
-        propensities = (zeros_train, zeros_val, zeros_test)
-
-    e_train, e_val, e_test = propensities
-    return TorchIHDP(
-        convert(ds.train, e_train),
-        convert(ds.val, e_val),
-        convert(ds.test, e_test),
-    )
-
-
-def cosine_warmup_lambda(
-    max_lambda: float, num_epochs: int, warmup_frac: float = 0.1
-) -> Callable[[int], float]:
-    """Return λ schedule that ramps up during the first epochs."""
-
-    warmup_epochs = max(1, int(num_epochs * warmup_frac))
-
-    def schedule(epoch: int) -> float:
-        if epoch < warmup_epochs:
-            val = (
-                max_lambda
-                * (1 - torch.cos(torch.tensor(epoch / warmup_epochs * torch.pi)))
-                / 2
-            )
-            return float(val.item())
-        return float(max_lambda)
-
-    return schedule
 
 
 def train(

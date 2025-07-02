@@ -1,6 +1,7 @@
 from .ihdp import IHDPDataset, IHDPSplit, load_ihdp
 from .twins import TwinsDataset, TwinsSplit, load_twins
 from .acic import ACICDataset, ACICSplit, load_acic
+from .torch_adapter import TorchIHDP, TorchSplit, torchify
 
 __all__ = [
     "IHDPDataset",
@@ -12,4 +13,7 @@ __all__ = [
     "TwinsDataset",
     "TwinsSplit",
     "load_twins",
+    "TorchIHDP",
+    "TorchSplit",
+    "torchify",
 ]
