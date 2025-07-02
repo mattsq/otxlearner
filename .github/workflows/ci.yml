@@ -35,7 +35,7 @@ jobs:
         run: |
           uv pip install --system -r requirements.txt
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
-          uv pip install --system geomloss pytest
+          uv pip install --system geomloss pytest pytest-cov
           pip install -e .
       - name: Prepare dataset
         run: |
@@ -89,7 +89,7 @@ jobs:
         run: |
           uv pip install --system -r requirements.txt
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cu118
-          uv pip install --system geomloss pytest
+          uv pip install --system geomloss pytest pytest-cov
           pip install -e .
       - name: Prepare dataset
         run: |
