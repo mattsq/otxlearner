@@ -1,0 +1,18 @@
+site_name: OTX Learner
+site_url: https://otxlearner.readthedocs.io
+theme:
+  name: material
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          setup_commands:
+            - import sys; sys.path.insert(0, 'src')
+nav:
+  - Home: index.md
+  - Quick Start: quick_start.md
+  - API Reference: api_reference.md
+  - Research Notes: research_notes.md
+  - FAQ: faq.md

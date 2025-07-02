@@ -10,3 +10,6 @@ jax==0.6.2
 jaxlib==0.6.2
 ott-jax==0.5.0
 jax2torch==0.0.7
+mkdocs==1.5.3
+mkdocs-material==9.5.5
+mkdocstrings[python]==0.24.0
