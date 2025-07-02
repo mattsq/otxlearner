@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+import importlib
 import torch
 from torch import nn
-from typing import Callable, TYPE_CHECKING, cast
+from typing import Any, Callable, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:  # pragma: no cover - hint-only imports
-    from jax.numpy import ndarray as Array  # type: ignore[import-not-found]
+    from typing import Any as Array
 else:  # pragma: no cover - runtime fallback
     Array = torch.Tensor
 
+jax2torch: Optional[Callable[[Callable[..., Any]], Callable[..., Any]]]
 try:  # pragma: no cover - optional deps
-    from jax2torch import jax2torch  # type: ignore[import-not-found]
-    from ott.geometry import pointcloud, costs  # type: ignore[import-not-found]
-    from ott.problems.linear import linear_problem  # type: ignore[import-not-found]
-    from ott.solvers.linear import sinkhorn  # type: ignore[import-not-found]
-
+    _jax2torch_mod = importlib.import_module("jax2torch")
+    jax2torch = cast(
+        Callable[[Callable[..., Any]], Callable[..., Any]],
+        getattr(_jax2torch_mod, "jax2torch"),
+    )
+    pointcloud = cast(Any, importlib.import_module("ott.geometry.pointcloud"))
+    costs = cast(Any, importlib.import_module("ott.geometry.costs"))
+    linear_problem = cast(
+        Any, importlib.import_module("ott.problems.linear.linear_problem")
+    )
+    sinkhorn = cast(Any, importlib.import_module("ott.solvers.linear.sinkhorn"))
     _HAS_JAX = True
 except Exception:  # pragma: no cover - optional deps
     jax2torch = None
