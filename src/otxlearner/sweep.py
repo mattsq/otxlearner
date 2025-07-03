@@ -9,7 +9,7 @@ import optuna
 from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
-from .train import train_from_config
+from .cli import train_from_config
 
 _wandb: Optional[ModuleType]
 try:  # pragma: no cover - optional dependency
@@ -26,8 +26,6 @@ def suggest(trial: optuna.trial.Trial) -> dict[str, Any]:
         "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
         "lambda_max": trial.suggest_float("lambda", 1e-2, 10.0, log=True),
         "epsilon": trial.suggest_float("epsilon", 0.01, 0.1),
-        "depth": trial.suggest_int("depth", 2, 4),
-        "width": trial.suggest_categorical("width", [64, 128, 256]),
     }
 
 
@@ -44,7 +42,7 @@ def _objective(
         config_dir=str(cfg_path.parent.resolve()), version_base=None
     ):
         cfg = compose(config_name=cfg_path.stem, overrides=overrides)
-    history = train_from_config(cfg)  # type: ignore[arg-type]
+    history = train_from_config(cfg)
     return history[-1]
 
 

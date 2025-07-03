@@ -5,10 +5,10 @@ OTX Learner is an experimental implementation of a **Sinkhorn‑penalised X‑Ne
 The code lives under `src/otxlearner` and includes dataset loaders, models and training scripts.
 
 ```python
-from otxlearner.train import main
+from otxlearner.cli import main
 
 # run a short IHDP experiment
-main(["--epochs", "5", "--log-dir", "runs/ihdp"])
+main(["ihdp", "sinkhorn", "--epochs", "5"])
 ```
 
 See the [documentation](https://otxlearner.readthedocs.io/) for a quick-start guide, API reference and research notes.
@@ -30,7 +30,7 @@ python -m pip install torch geomloss
 python -m pip install -r requirements.txt
 python -m pip install -e .
 
-python -m otxlearner.train --epochs 5 --log-dir runs/ihdp
+python -m otxlearner.train ihdp sinkhorn --epochs 5 --log-dir runs/ihdp
 ```
 
 The [training_curves.ipynb](notebooks/training_curves.ipynb) notebook shows how to visualise the TensorBoard logs produced during training.
