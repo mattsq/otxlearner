@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
 
+[project.optional-dependencies]
+docs = ["mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs"]
+
 [tool.black]
 line-length = 88
 
