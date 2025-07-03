@@ -8,6 +8,10 @@ import inspect
 from typing import Any, Callable, cast
 import numpy as np
 
+# ensure dataset and trainer registries are populated
+from . import data  # noqa: F401
+from .trainers import dann, sinkhorn  # noqa: F401
+
 from .registries import _DATASETS, _TRAINERS
 from .trainers.base import BaseTrainer
 from .data.types import DatasetProtocol
