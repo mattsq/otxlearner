@@ -8,8 +8,8 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          setup_commands:
-            - import sys, os; sys.path.insert(0, 'src')
+          paths:
+            - src
 nav:
   - Home: index.md
   - Theory: theory.md
