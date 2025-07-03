@@ -16,7 +16,7 @@ class BaseTrainer(abc.ABC):
         self.device = torch.device(device)
         self.optimizer: torch.optim.Optimizer | None = None
         self.lambda_schedule: Callable[[int], float] | None = None
-        self.scaler = torch.cuda.amp.GradScaler()
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.device.type == "cuda")
 
     @abc.abstractmethod
     def training_step(
@@ -53,7 +53,7 @@ class BaseTrainer(abc.ABC):
             running_loss = 0.0
             for batch in train_loader:
                 self.optimizer.zero_grad(set_to_none=True)
-                with torch.cuda.amp.autocast():
+                with torch.autocast(self.device.type):
                     loss = self.training_step(batch, epoch, lam)
                 self.scaler.scale(loss).backward()
                 self.scaler.unscale_(self.optimizer)
