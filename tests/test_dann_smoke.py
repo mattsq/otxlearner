@@ -5,7 +5,7 @@ from pathlib import Path
 from otxlearner.cli import main as cli_main
 
 
-def test_train_dann_smoke(ihdp_root: Path) -> None:
+def test_train_dann_smoke(ihdp_root: Path, fast_smoke: None) -> None:
     history = cli_main(
         [
             "ihdp",
