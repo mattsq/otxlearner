@@ -12,3 +12,11 @@ def test_mlp_encoder_shapes() -> None:
     outcome, tau = model(x)
     assert outcome.shape == (batch_size,)
     assert tau.shape == (batch_size,)
+
+
+def test_mlp_predict_tau() -> None:
+    model = MLPEncoder(3)
+    x = torch.randn(2, 3)
+    direct = model(x)[1]
+    pred = model.predict_tau(x)
+    assert torch.allclose(direct, pred)
