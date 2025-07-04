@@ -156,7 +156,7 @@ xnet-sinkhorn/
 │   ├── evaluate.py      # PEHE, ATE, policy risk, plots
 │   └── utils/
 ├── configs/             # YAML cfgs for Hydra / OmegaConf
-├── notebooks/           # quick EDA & sanity checks
+├── examples/            # notebooks and example scripts
 ├── tests/               # pytest + property tests (hypothesis)
 ├── requirements.txt     # pin geomloss, torch, optuna …
 ├── Makefile             # common recipes (env, fmt, test, run)
