@@ -12,6 +12,14 @@ def test_flow_encoder_shapes() -> None:
     assert tau.shape == (2,)
 
 
+def test_flow_predict_tau() -> None:
+    model = FlowEncoder(3)
+    x = torch.randn(2, 3)
+    _, tau = model(x)
+    pred = model.predict_tau(x)
+    assert torch.allclose(tau, pred)
+
+
 def test_realnvp_inverse() -> None:
     flow = RealNVP(4, n_flows=2)
     x = torch.randn(3, 4)

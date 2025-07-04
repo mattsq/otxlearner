@@ -91,6 +91,11 @@ class FlowEncoder(nn.Module):
         tau = self.tau_head(feats).squeeze(-1)
         return outcome, tau
 
+    def predict_tau(self, x: torch.Tensor) -> torch.Tensor:
+        """Return treatment effect predictions for ``x``."""
+        _outcome, tau = self.forward(x)
+        return tau
+
     def inverse(
         self, z: torch.Tensor
     ) -> torch.Tensor:  # pragma: no cover - simple inverse
