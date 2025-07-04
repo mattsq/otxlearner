@@ -5,11 +5,17 @@ from types import ModuleType
 from typing import Any, Optional
 import importlib
 
-import optuna
 from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
 from .cli import train_from_config
+
+_optuna: Optional[ModuleType]
+try:  # pragma: no cover - optional dependency
+    _optuna = importlib.import_module("optuna")
+except Exception:
+    _optuna = None
+optuna: Optional[ModuleType] = _optuna
 
 _wandb: Optional[ModuleType]
 try:  # pragma: no cover - optional dependency
@@ -21,7 +27,7 @@ wandb: Optional[ModuleType] = _wandb
 __all__ = ["run_study", "suggest"]
 
 
-def suggest(trial: optuna.trial.Trial) -> dict[str, Any]:
+def suggest(trial: Any) -> dict[str, Any]:
     return {
         "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
         "lambda_max": trial.suggest_float("lambda", 1e-2, 10.0, log=True),
@@ -29,9 +35,7 @@ def suggest(trial: optuna.trial.Trial) -> dict[str, Any]:
     }
 
 
-def _objective(
-    trial: optuna.trial.Trial, cfg_path: Path, data_root: Path | None
-) -> float:
+def _objective(trial: Any, cfg_path: Path, data_root: Path | None) -> float:
     params = suggest(trial)
     overrides = [f"{k}={v}" for k, v in params.items()]
     if data_root is not None:
@@ -52,7 +56,11 @@ def run_study(
     *,
     data_root: Path | None = None,
     wandb_log: bool = False,
-) -> optuna.study.Study:
+) -> Any:
+    if optuna is None:
+        raise ImportError(
+            "optuna is required for run_study; install with 'pip install optuna'"
+        )
     cfg = Path(cfg_path)
     study = optuna.create_study(direction="minimize")
     study.optimize(lambda t: _objective(t, cfg, data_root), n_trials=n_trials)
