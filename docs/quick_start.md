@@ -11,5 +11,5 @@ python -m pip install -e .
 python -m otxlearner.train ihdp sinkhorn --epochs 5 --log-dir runs/ihdp
 ```
 
-See the `notebooks/training_curves.ipynb` notebook for visualising TensorBoard logs.
+See the `examples/training_curves.ipynb` notebook for visualising TensorBoard logs.
 
