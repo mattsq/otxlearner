@@ -7,6 +7,7 @@ from otxlearner.models import MLPEncoder
 
 
 def test_one_epoch_loss_decreases() -> None:
+    torch.manual_seed(0)
     g = torch.Generator().manual_seed(0)
     n = 256
     x = torch.randn(n, 10, generator=g)
