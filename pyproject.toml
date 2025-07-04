@@ -20,7 +20,16 @@ dependencies = [
 [project.optional-dependencies]
 docs = ["mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs"]
 dev = ["ruff", "black", "mypy", "pytest", "pytest-cov"]
-bench = ["tensorboard", "optuna", "wandb", "jax", "jaxlib", "ott-jax", "jax2torch"]
+bench = [
+    "tensorboard",
+    "optuna",
+    "wandb",
+    "jax",
+    "jaxlib",
+    "ott-jax",
+    "jax2torch",
+    "pandas",
+]
 
 [tool.black]
 line-length = 88

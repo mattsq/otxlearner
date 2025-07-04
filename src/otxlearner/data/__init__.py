@@ -1,6 +1,7 @@
 from .ihdp import IHDPDataset, IHDPSplit, load_ihdp
 from .twins import TwinsDataset, TwinsSplit, load_twins
 from .acic import ACICDataset, ACICSplit, load_acic
+from .criteo import CriteoDataset, CriteoSplit, load_criteo_uplift
 from .torch_adapter import TorchIHDP, TorchSplit, torchify
 
 __all__ = [
@@ -13,6 +14,9 @@ __all__ = [
     "TwinsDataset",
     "TwinsSplit",
     "load_twins",
+    "CriteoDataset",
+    "CriteoSplit",
+    "load_criteo_uplift",
     "TorchIHDP",
     "TorchSplit",
     "torchify",
@@ -37,3 +41,10 @@ def get_twins(
 @register_dataset("acic")
 def get_acic(root: str | Path = Path.home() / ".cache/otxlearner/acic") -> ACICDataset:
     return load_acic(root)
+
+
+@register_dataset("criteo")
+def get_criteo(
+    root: str | Path = Path.home() / ".cache/otxlearner/criteo",
+) -> CriteoDataset:
+    return load_criteo_uplift(root)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from otxlearner.utils.metrics import ate, pehe
+from otxlearner.utils.metrics import ate, pehe, policy_risk
 
 
 def test_pehe() -> None:
@@ -17,3 +17,12 @@ def test_ate() -> None:
     true = torch.tensor([0.0, 1.0, 3.0])
     expected = pred.mean().item() - true.mean().item()
     assert abs(ate(pred, true) - expected) < 1e-6
+
+
+def test_policy_risk() -> None:
+    tau_pred = torch.tensor([1.0, -1.0])
+    tau_true = torch.tensor([1.0, -1.0])
+    mu0 = torch.tensor([0.0, 0.0])
+    mu1 = torch.tensor([1.0, 1.0])
+    risk = policy_risk(tau_pred, tau_true, mu0, mu1)
+    assert abs(risk) < 1e-6
