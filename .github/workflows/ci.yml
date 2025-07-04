@@ -22,7 +22,7 @@ jobs:
         with:
           path: |
             ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-${{ matrix.python-version }}-
       - uses: actions/cache@v3
@@ -33,9 +33,8 @@ jobs:
         run: python -m pip install uv
       - name: Install dependencies
         run: |
-          uv pip install --system -r requirements.txt
+          uv pip install --system .[dev,docs,bench]
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
-          uv pip install --system geomloss pytest pytest-cov
           pip install -e .
       - name: Prepare dataset
         run: |
@@ -78,7 +77,7 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: ~/.cache/uv
-          key: cuda-uv-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+          key: cuda-uv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             cuda-uv-${{ matrix.python-version }}-
       - uses: actions/cache@v3
@@ -89,9 +88,8 @@ jobs:
         run: python -m pip install uv
       - name: Install dependencies
         run: |
-          uv pip install --system -r requirements.txt
+          uv pip install --system .[dev,docs,bench]
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cu118
-          uv pip install --system geomloss pytest pytest-cov
           pip install -e .
       - name: Prepare dataset
         run: |
