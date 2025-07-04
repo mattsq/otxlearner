@@ -17,7 +17,7 @@ from .data import load_ihdp, load_twins, load_acic
 from .data.types import DatasetProtocol
 from .models import MLPEncoder, Sinkhorn
 from .data.torch_adapter import torchify
-from .utils import ate, pehe
+from .utils import ate, pehe, policy_risk
 
 _wandb: Optional[ModuleType]
 try:  # pragma: no cover - optional dependency
@@ -65,6 +65,8 @@ def evaluate(
     bal = 0.0
     tau_preds: list[torch.Tensor] = []
     tau_targets: list[torch.Tensor] = []
+    mu0_all: list[torch.Tensor] = []
+    mu1_all: list[torch.Tensor] = []
     with torch.no_grad():
         for x, t, _yf, mu0, mu1, _e in loader:
             x, t, mu0, mu1 = (
@@ -83,16 +85,21 @@ def evaluate(
                 bal += sinkhorn(feats_t, feats_c).item() * x.size(0)
             tau_preds.append(tau.cpu())
             tau_targets.append(tau_true.cpu())
+            mu0_all.append(mu0.cpu())
+            mu1_all.append(mu1.cpu())
 
     mse = tau_err / len(ds.test)
     bal /= len(ds.test)
     tau_pred = torch.cat(tau_preds)
     tau_true = torch.cat(tau_targets)
+    mu0_cat = torch.cat(mu0_all)
+    mu1_cat = torch.cat(mu1_all)
     metrics = {
         "mse": mse,
         "balance": bal,
         "pehe": pehe(tau_pred, tau_true),
         "ate_error": ate(tau_pred, tau_true),
+        "policy_risk": policy_risk(tau_pred, tau_true, mu0_cat, mu1_cat),
     }
 
     if csv_path is not None:
@@ -130,6 +137,7 @@ def evaluate(
                 "balance": bal,
                 "pehe": metrics["pehe"],
                 "ate_error": metrics["ate_error"],
+                "policy_risk": metrics["policy_risk"],
             }
         )
         wandb.finish()

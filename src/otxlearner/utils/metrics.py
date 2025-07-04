@@ -13,4 +13,16 @@ def ate(tau_pred: torch.Tensor, tau_true: torch.Tensor) -> float:
     return float(tau_pred.mean().item() - tau_true.mean().item())
 
 
-__all__ = ["pehe", "ate"]
+def policy_risk(
+    tau_pred: torch.Tensor,
+    tau_true: torch.Tensor,
+    mu0: torch.Tensor,
+    mu1: torch.Tensor,
+) -> float:
+    """Return policy risk w.r.t. sign of τ."""
+    best_value = torch.where(tau_true > 0, mu1, mu0).mean().item()
+    pred_value = torch.where(tau_pred > 0, mu1, mu0).mean().item()
+    return float(best_value - pred_value)
+
+
+__all__ = ["pehe", "ate", "policy_risk"]
