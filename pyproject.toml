@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "otxlearner"
@@ -9,9 +9,18 @@ description = "Sinkhorn-penalised X-Net for causal inference"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
+dependencies = [
+    "torch",
+    "geomloss",
+    "numpy",
+    "scikit-learn",
+    "hydra-core",
+]
 
 [project.optional-dependencies]
 docs = ["mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs"]
+dev = ["ruff", "black", "mypy", "pytest", "pytest-cov"]
+bench = ["tensorboard", "optuna", "wandb", "jax", "jaxlib", "ott-jax", "jax2torch"]
 
 [tool.black]
 line-length = 88
@@ -23,3 +32,4 @@ line-length = 88
 python_version = "3.10"
 strict = true
 packages = ["otxlearner"]
+

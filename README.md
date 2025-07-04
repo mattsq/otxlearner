@@ -19,9 +19,7 @@ See the [documentation](https://otxlearner.readthedocs.io/) for a quick-start gu
 Install the required packages and run a short training session on IHDP.
 
 ```bash
-python -m pip install torch geomloss
-python -m pip install -r requirements.txt
-python -m pip install -e .
+python -m pip install -e .[bench]
 
 python -m otxlearner.train ihdp sinkhorn --epochs 5 --log-dir runs/ihdp
 ```
