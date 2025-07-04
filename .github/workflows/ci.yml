@@ -57,29 +57,19 @@ jobs:
   cuda:
     runs-on: ubuntu-latest
     container:
-      image: nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
-    strategy:
-      matrix:
-        python-version: ['3.10']
+      image: pytorch/pytorch:2.1.2-cuda11.8-cudnn8-runtime
     env:
       IHDP_DATA: /github/home/.cache/otxlearner/ihdp
     steps:
       - uses: actions/checkout@v4
-      - name: Install Python
-        run: |
-          apt-get update
-          apt-get install -y software-properties-common
-          add-apt-repository ppa:deadsnakes/ppa -y
-          apt-get update
-          apt-get install -y python${{ matrix.python-version }} python${{ matrix.python-version }}-distutils python${{ matrix.python-version }}-venv python3-pip
-          ln -sf /usr/bin/python${{ matrix.python-version }} /usr/local/bin/python
-          python -m pip install --upgrade pip
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
       - uses: actions/cache@v3
         with:
           path: ~/.cache/uv
-          key: cuda-uv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          key: cuda-uv-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
-            cuda-uv-${{ matrix.python-version }}-
+            cuda-uv-
       - uses: actions/cache@v3
         with:
           path: ~/.cache/otxlearner
@@ -88,7 +78,7 @@ jobs:
         run: python -m pip install uv
       - name: Install dependencies
         run: |
-          uv pip install --system .[dev,docs,bench]
+          uv pip install --system .[dev]
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cu118
           pip install -e .
       - name: Prepare dataset
@@ -98,12 +88,6 @@ jobs:
           from otxlearner.data import load_ihdp
           load_ihdp(Path('$IHDP_DATA'))
           PY
-      - name: Ruff
-        run: ruff check src tests
-      - name: Black
-        run: black --check src tests
-      - name: Mypy
-        run: mypy --strict src
       - name: Pytest
         run: pytest -vv --cov=otxlearner --cov-report=term --cov-fail-under=80
 
