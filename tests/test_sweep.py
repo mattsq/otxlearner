@@ -1,5 +1,9 @@
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("optuna")
+
 from otxlearner.sweep import run_study
 
 
