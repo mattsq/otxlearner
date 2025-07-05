@@ -49,6 +49,37 @@ ds = load_tabular(
 )
 ```
 
+### Train on a CSV file
+
+After loading the data you can train a `SinkhornTrainer` using the generic
+loader:
+
+```python
+import numpy as np
+from otxlearner.data import load_tabular, torchify
+from otxlearner.trainers import SinkhornTrainer
+from otxlearner.utils import cross_fit_propensity
+from otxlearner.loops import prepare_loaders
+
+ds_np = load_tabular(
+    "data.csv",
+    features=["f0", "f1", "f2"],
+    treatment="t",
+    outcome="y",
+)
+
+x_all = np.concatenate([ds_np.train.x, ds_np.val.x, ds_np.test.x])
+t_all = np.concatenate([ds_np.train.t, ds_np.val.t, ds_np.test.t])
+e_all = cross_fit_propensity(x_all, t_all, seed=0)
+n_tr = len(ds_np.train.x)
+n_val = len(ds_np.val.x)
+ds = torchify(ds_np, (e_all[:n_tr], e_all[n_tr : n_tr + n_val], e_all[n_tr + n_val :]))
+
+train_loader, val_loader = prepare_loaders(ds, batch_size=512)
+trainer = SinkhornTrainer(ds.train.x.shape[1])
+history = trainer.fit(train_loader, val_loader, epochs=5)
+```
+
 ## Experiment tracking
 
 Set the `WANDB_API_KEY` environment variable or run `wandb login` to enable Weights & Biases logging via `--wandb` on the train and evaluate scripts.
