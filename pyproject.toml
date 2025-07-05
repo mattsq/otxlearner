@@ -19,7 +19,14 @@ dependencies = [
 
 [project.optional-dependencies]
 docs = ["mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs"]
-dev = ["ruff", "black", "mypy", "pytest", "pytest-cov"]
+dev = [
+    "ruff",
+    "black",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pandas-stubs",
+]
 bench = [
     "tensorboard",
     "optuna",
