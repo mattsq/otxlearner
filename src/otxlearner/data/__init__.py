@@ -2,6 +2,7 @@ from .ihdp import IHDPDataset, IHDPSplit, load_ihdp
 from .twins import TwinsDataset, TwinsSplit, load_twins
 from .acic import ACICDataset, ACICSplit, load_acic
 from .criteo import CriteoDataset, CriteoSplit, load_criteo_uplift
+from .tabular import TabularDataset, TabularSplit, load_tabular
 from .torch_adapter import TorchIHDP, TorchSplit, torchify
 
 __all__ = [
@@ -17,6 +18,9 @@ __all__ = [
     "CriteoDataset",
     "CriteoSplit",
     "load_criteo_uplift",
+    "TabularDataset",
+    "TabularSplit",
+    "load_tabular",
     "TorchIHDP",
     "TorchSplit",
     "torchify",
